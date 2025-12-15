@@ -34,6 +34,9 @@ android {
     }
 }
 
+group = "com.github.Gowthamgsv32"
+version = "1.0.0"
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
