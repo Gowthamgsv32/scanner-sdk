@@ -6,7 +6,7 @@ plugins {
 android {
     namespace = "com.example.scanner_sdk"
     compileSdk {
-        version = release(36)
+        version = release(34)
     }
 
     defaultConfig {
@@ -35,7 +35,7 @@ android {
 }
 
 group = "com.github.Gowthamgsv32"
-version = "1.0.0"
+version = "1.0.1"
 
 dependencies {
     implementation(libs.androidx.core.ktx)
