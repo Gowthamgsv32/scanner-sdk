@@ -60,6 +60,13 @@ class ScannerController(
     private var lastValue: String? = null
     private var isFlashEnabled = false
     private val barCodeList = arrayListOf<String>()
+    private var lensFacing = CameraSelector.LENS_FACING_BACK
+    private var currentZoomRatio = 1f
+    private var minZoom = 1f
+    private var maxZoom = 5f
+    private val ZOOM_STEP = 0.5f
+
+
 
     fun startSingleScanner(context: Context) {
         start(context)
@@ -74,6 +81,13 @@ class ScannerController(
     }
     private fun start(context: Context) {
 
+        camera?.cameraInfo?.zoomState?.value?.let { zoomState ->
+            minZoom = zoomState.minZoomRatio
+            maxZoom = zoomState.maxZoomRatio
+            currentZoomRatio = zoomState.zoomRatio
+            updateZoomUI()
+        }
+
         singleScannerView?.previewView?.visibility = View.VISIBLE
 
         // For torch mode (continuous flash for preview)
@@ -86,8 +100,41 @@ class ScannerController(
             /* todo: openGallery()*/
         }
 
+        singleScannerView?.cameraSwitch?.setOnClickListener {
+            lensFacing =
+                if (lensFacing == CameraSelector.LENS_FACING_BACK)
+                    CameraSelector.LENS_FACING_FRONT
+                else
+                    CameraSelector.LENS_FACING_BACK
+
+            // Reset flash when switching camera
+            isFlashEnabled = false
+            camera?.cameraControl?.enableTorch(false)
+            toggleFlash(false, singleScannerView.flashButton)
+
+            cameraProvider?.let {
+                val preview = Preview.Builder()
+                    .setTargetResolution(Size(1920, 1080))
+                    .build().also {
+                        it.surfaceProvider = singleScannerView.previewView.surfaceProvider
+                    }
+
+                imageAnalysis?.let { analysis ->
+                    bindCamera(context, preview, analysis)
+                }
+            }
+        }
+
+        singleScannerView?.zoomPlus?.setOnClickListener {
+            increaseZoom()
+        }
+
+        singleScannerView?.zoomMinus?.setOnClickListener {
+            decreaseZoom()
+        }
+
         // Setup zoom control
-        singleScannerView?.zoomSeekBar?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+        /*singleScannerView?.zoomSeekBar?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
                     val zoomRatio = 1f + (progress / 100f) * 4f // Zoom range 1x to 5x
@@ -97,7 +144,7 @@ class ScannerController(
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        })*/
 
         singleScannerView?.overlayView?.visibility = View.VISIBLE
 //        singleScannerView?.txtTitle?.text = "Single Scanner"
@@ -137,6 +184,41 @@ class ScannerController(
 
         }, ContextCompat.getMainExecutor(context))
     }
+    private fun increaseZoom() {
+        val newZoom = (currentZoomRatio + ZOOM_STEP).coerceAtMost(maxZoom)
+        applyZoom(newZoom)
+    }
+
+    private fun decreaseZoom() {
+        val newZoom = (currentZoomRatio - ZOOM_STEP).coerceAtLeast(minZoom)
+        applyZoom(newZoom)
+    }
+
+    private fun applyZoom(zoom: Float) {
+        currentZoomRatio = zoom
+        camera?.cameraControl?.setZoomRatio(zoom)
+        updateZoomUI()
+    }
+    private fun updateZoomUI() {
+        val percentage = ((currentZoomRatio / maxZoom) * 100).toInt()
+        singleScannerView?.zoomPercentage?.text = "$percentage%"
+        updateZoomButtons()
+
+    }
+    private fun updateZoomButtons() {
+        singleScannerView?.zoomPlus?.isEnabled = currentZoomRatio < maxZoom
+        singleScannerView?.zoomMinus?.isEnabled = currentZoomRatio > minZoom
+    }
+    private fun updateAuthZoomUI() {
+        val percentage = ((currentZoomRatio / maxZoom) * 100).toInt()
+        authScannerView?.zoomPercentage?.text = "$percentage%"
+        updateAuthZoomButtons()
+
+    }
+    private fun updateAuthZoomButtons() {
+        authScannerView?.zoomPlus?.isEnabled = currentZoomRatio < maxZoom
+        authScannerView?.zoomMinus?.isEnabled = currentZoomRatio > minZoom
+    }
 
     private fun startAuth(context: Context) {
 
@@ -151,20 +233,38 @@ class ScannerController(
         authScannerView?.btnGallery?.setOnClickListener {
             /* todo: openGallery()*/
         }
+        authScannerView?.cameraSwitch?.setOnClickListener {
+            lensFacing =
+                if (lensFacing == CameraSelector.LENS_FACING_BACK)
+                    CameraSelector.LENS_FACING_FRONT
+                else
+                    CameraSelector.LENS_FACING_BACK
 
-        // Setup zoom control
-        authScannerView?.zoomSeekBar?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    val zoomRatio = 1f + (progress / 100f) * 4f // Zoom range 1x to 5x
-                    camera?.cameraControl?.setZoomRatio(zoomRatio)
+            // Reset flash when switching camera
+            isFlashEnabled = false
+            camera?.cameraControl?.enableTorch(false)
+            toggleFlash(false, authScannerView.flashButton)
+
+            cameraProvider?.let {
+                val preview = Preview.Builder()
+                    .setTargetResolution(Size(1920, 1080))
+                    .build().also {
+                        it.surfaceProvider = authScannerView.previewView.surfaceProvider
+                    }
+
+                imageAnalysis?.let { analysis ->
+                    bindCamera(context, preview, analysis)
                 }
             }
+        }
 
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        authScannerView?.zoomPlus?.setOnClickListener {
+            increaseZoom()
+        }
 
+        authScannerView?.zoomMinus?.setOnClickListener {
+            decreaseZoom()
+        }
         authScannerView?.overlayView?.visibility = View.VISIBLE
 //        authScannerView?.txtTitle?.text = "Authendication Scanner"
 
@@ -297,6 +397,25 @@ class ScannerController(
 
         showScanResultBottomSheet(raw = barcode, parsedMap = parsed)
 //        handleAuthenticationResult(raw, barcodes.format)
+    }
+
+    private fun bindCamera(
+        context: Context,
+        preview: Preview,
+        imageAnalysis: ImageAnalysis
+    ) {
+        cameraProvider?.unbindAll()
+
+        val cameraSelector = CameraSelector.Builder()
+            .requireLensFacing(lensFacing)
+            .build()
+
+        camera = cameraProvider?.bindToLifecycle(
+            lifecycleOwner,
+            cameraSelector,
+            preview,
+            imageAnalysis
+        )
     }
 
     private fun handleAuthScan(barcodes: List<Barcode>) {

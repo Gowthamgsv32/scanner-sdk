@@ -20,5 +20,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "BarCode-SDK"
-//include(":app")
+include(":app")
 include(":scanner-sdk")

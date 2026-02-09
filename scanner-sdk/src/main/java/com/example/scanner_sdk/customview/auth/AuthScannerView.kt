@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.camera.view.PreviewView
@@ -22,9 +23,10 @@ class AuthScannerView @JvmOverloads constructor(
     val overlayView: OverlayView
     val btnGallery: ImageButton
     val flashButton: ImageButton
-    val zoomSeekBar: SeekBar
-/*    val singleScan: LinearLayout
-    val multiScan: LinearLayout*/
+    val cameraSwitch: ImageButton
+    val zoomPlus: ImageView
+    val zoomMinus: ImageView
+    val zoomPercentage: TextView
 
     init {
         LayoutInflater.from(context).inflate(R.layout.auth_scanner, this, true)
@@ -34,8 +36,9 @@ class AuthScannerView @JvmOverloads constructor(
         overlayView = findViewById(R.id.authOverlayView)
         btnGallery = findViewById(R.id.auth_btn_gallery)
         flashButton = findViewById(R.id.auth_btn_flash_toggle)
-        zoomSeekBar = findViewById(R.id.auth_zoom_seekbar)
-//        singleScan = findViewById(R.id.nav_single_scan)
-//        multiScan = findViewById(R.id.nav_multi_scan)
+        cameraSwitch = findViewById(R.id.auth_btn_camera_switch)
+        zoomPlus = findViewById(R.id.auth_zoom_plus)
+        zoomMinus = findViewById(R.id.auth_zoom_minus)
+        zoomPercentage = findViewById(R.id.auth_zoom_percentage)
     }
 }

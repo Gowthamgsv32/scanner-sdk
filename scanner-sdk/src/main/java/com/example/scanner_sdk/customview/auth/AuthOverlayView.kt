@@ -31,7 +31,7 @@ class AuthOverlayView @JvmOverloads constructor(
     val overlayView: OverlayView
     val btnGallery: ImageButton
     val flashButton: ImageButton
-    val zoomSeekBar: SeekBar
+//    val zoomSeekBar: SeekBar
     /*    val singleScan: LinearLayout
         val multiScan: LinearLayout*/
 
@@ -43,7 +43,7 @@ class AuthOverlayView @JvmOverloads constructor(
         overlayView = findViewById(R.id.overlayView)
         btnGallery = findViewById(R.id.btn_gallery)
         flashButton = findViewById(R.id.btn_flash_toggle)
-        zoomSeekBar = findViewById(R.id.zoom_seekbar)
+//        zoomSeekBar = findViewById(R.id.zoom_seekbar)
 //        singleScan = findViewById(R.id.nav_single_scan)
 //        multiScan = findViewById(R.id.nav_multi_scan)
     }
