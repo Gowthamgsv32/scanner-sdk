@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_margin="16dp"
+    android:background="@drawable/bg_dialog_rounded"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <!-- Drag Indicator -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center" />
+
+    <!-- VERIFIED HEADER -->
+    <LinearLayout
+        android:layout_marginTop="16dp"
+        android:padding="16dp"
+        android:orientation="horizontal"
+        android:background="@drawable/bg_verified"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:id="@+id/img_verify"
+            android:src="@drawable/ic_tick"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:tint="@color/light_green"/>
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_marginStart="12dp"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:id="@+id/txt_title"
+                android:text="Authentic Product"
+                android:textColor="#00E676"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+            <TextView
+                android:id="@+id/txt_message"
+                android:text="This item has been verified as genuine."
+                android:textColor="#B0FFCC"
+                android:textSize="13sp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/txt_verified_status"
+            android:text="Verified"
+            android:textColor="#000000"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/bg_verified_chip"
+            android:textStyle="bold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <!-- PRODUCT INFO -->
+    <TextView
+        android:text="Product Information"
+        android:textColor="#AAAAAA"
+        android:textStyle="bold"
+        android:layout_marginTop="20dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal"
+        >
+        <include layout="@layout/item_info_card"
+            android:id="@+id/cardGTIN"/>
+
+        <include layout="@layout/item_info_card"
+            android:id="@+id/cardBatch"/>
+
+    </LinearLayout>
+
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal"
+        >
+        <include layout="@layout/item_info_card"
+            android:id="@+id/cardProd"/>
+
+        <include layout="@layout/item_info_card"
+            android:id="@+id/cardExp"/>
+    </LinearLayout>
+
+    <!-- CONTINUE BUTTON -->
+    <Button
+        android:id="@+id/btnContinue"
+        android:text="Continue"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:backgroundTint="#198CFF"
+        android:textColor="@android:color/white"
+        android:layout_marginTop="20dp"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"/>
+
+</LinearLayout>

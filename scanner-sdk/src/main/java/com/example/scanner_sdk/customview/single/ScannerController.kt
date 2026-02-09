@@ -16,17 +16,33 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import com.example.scanner_sdk.customview.BarcodeDataProcessor
 import com.example.scanner_sdk.customview.ConvertToAuthentication
 import com.example.scanner_sdk.customview.auth.AuthScannerView
+import com.example.scanner_sdk.customview.dialog.AuthResultDialog
+import com.example.scanner_sdk.customview.dialog.ScanResultBottomSheet
 import com.example.scanner_sdk.customview.getBarcodeTypeName
 import com.example.scanner_sdk.customview.model.BarcodeAuthMultiRequest
 import com.example.scanner_sdk.customview.model.FrameMetadata
+import com.example.scanner_sdk.customview.model.GS1ParsedResult
 import com.example.scanner_sdk.customview.multi.view.MultiScannerView
+import com.example.scanner_sdk.customview.parseBarcodeLikeMultiScan
+import com.example.scanner_sdk.customview.parseBarcodeLikeMultiScanForAuth
 import com.example.scanner_sdk.customview.single.view.SingleScannerView
 import com.example.scanner_sdk.customview.toggleFlash
+import com.google.gson.Gson
+import com.google.gson.JsonParser
 import com.google.mlkit.vision.barcode.common.Barcode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.Executors
 
 class ScannerController(
@@ -84,7 +100,7 @@ class ScannerController(
         })
 
         singleScannerView?.overlayView?.visibility = View.VISIBLE
-        singleScannerView?.txtTitle?.text = "Single Scanner"
+//        singleScannerView?.txtTitle?.text = "Single Scanner"
 
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
@@ -105,7 +121,7 @@ class ScannerController(
                 BarcodeAnalyzer(
                     onResults = { barcodes, meta ->
                         singleScannerView?.overlayView?.setResults(barcodes, meta)
-                        handleScan(barcodes)
+                        handleSingleScan(barcodes)
                     },
                 )
             )
@@ -150,7 +166,7 @@ class ScannerController(
         })
 
         authScannerView?.overlayView?.visibility = View.VISIBLE
-        authScannerView?.txtTitle?.text = "Authendication Scanner"
+//        authScannerView?.txtTitle?.text = "Authendication Scanner"
 
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
@@ -171,7 +187,7 @@ class ScannerController(
                 BarcodeAnalyzer(
                     onResults = { barcodes, meta ->
                         authScannerView?.overlayView?.setResults(barcodes, meta)
-                        handleScan(barcodes)
+                        handleAuthScan(barcodes)
                     },
                 )
             )
@@ -267,18 +283,172 @@ class ScannerController(
 
         }, ContextCompat.getMainExecutor(context))
     }
-    private fun handleScan(barcodes: List<Barcode>) {
-        val barcode = barcodes.firstOrNull()?: return
-        val raw = barcode.rawValue ?: return
+    private fun handleSingleScan(barcodes: List<Barcode>) {
+        val barcodes = barcodes.firstOrNull()?: return
+        val raw = barcodes.rawValue ?: return
 
         if (raw == lastValue) return
         lastValue = raw
 
-        onScanned(raw)
-        Log.d("BarcodeAnalyzer", "✅ Scanned: $raw")
-        handleAuthenticationResult(raw, barcode.format)
+//        onScanned(raw)
+        val (parsed, barcode, encrypted) = parseBarcodeLikeMultiScan(raw)
+// Stop repeated scanning
+        lastValue = raw
+
+        showScanResultBottomSheet(raw = barcode, parsedMap = parsed)
+//        handleAuthenticationResult(raw, barcodes.format)
     }
 
+    private fun handleAuthScan(barcodes: List<Barcode>) {
+        val barcodes = barcodes.firstOrNull()?: return
+        val raw = barcodes.rawValue ?: return
+
+        if (raw == lastValue) return
+        lastValue = raw
+
+//        onScanned(raw)
+        val result = parseBarcodeLikeMultiScanForAuth(raw)
+// Stop repeated scanning
+        lastValue = raw
+
+        lifecycleOwner.lifecycleScope.launch {
+            authenticateBarcode(
+                barcode = result.barcodeData,
+                result.encryptedText,
+                companyId = result.companyId,
+                onError = {
+                    showAuthScanResult(
+                        raw = result.barcodeData,
+                        parsedMap = result.parsedResults,
+                        isError = true,
+                        message = it
+                    )
+                },
+                onSuccess = {
+                    showAuthScanResult(
+                        raw = result.barcodeData,
+                        parsedMap = result.parsedResults,
+                        message = it,
+                        isError = false,
+                    )
+                }
+            )
+        }
+
+//        handleAuthenticationResult(raw, barcodes.format)
+    }
+
+    suspend fun authenticateBarcode(
+        barcode: String,
+        encryptedText: String,
+        companyId: String,
+        onError: (String) -> Unit,
+        onSuccess: (String) -> Unit,
+    ) {
+        Log.d("BARCODESCANLOG", "authenticateBarcode: $barcode, \n $encryptedText,\n $companyId")
+        val url = "https://dlhub.8aiku.com/scan/auth-bc"
+        Log.d("AUTH_API", url)
+
+        try {
+            val requestBody = listOf(
+                mapOf(
+                    "barcode_data" to barcode,
+                    "encrypted_text" to encryptedText,
+                    "company_id" to companyId
+                )
+            )
+
+            Log.d("AUTH_API", "requestBody = $requestBody")
+
+            val json = Gson().toJson(requestBody)
+
+            val body = json.toRequestBody("application/json".toMediaType())
+
+            val request = Request.Builder()
+                .url(url)
+                .post(body)
+                .addHeader("Content-Type", "application/json")
+                .build()
+
+            val client = OkHttpClient()
+
+            val response = withContext(Dispatchers.IO) {
+                client.newCall(request).execute()
+            }
+
+            val responseBody = response.body?.string()
+            Log.d("AUTH_API", "========== AUTH API RESPONSE ==========")
+            Log.d("AUTH_API", responseBody ?: "null")
+            Log.d("AUTH_API", "======================================")
+
+            if (responseBody.isNullOrEmpty()) {
+                onError("⚠️ Empty response from server")
+                return
+            }
+
+            val jsonElement = JsonParser.parseString(responseBody)
+
+            if (jsonElement.isJsonArray) {
+                val array = jsonElement.asJsonArray
+                val first = array.firstOrNull()?.asJsonObject
+
+                val quality = first?.get("quality")?.asString
+
+                if (quality != null) {
+                    if (quality.equals("Fake", ignoreCase = true)) {
+                        onError("❌ Product Not Authentic")
+                    } else {
+                        onSuccess("✅ This Product is 100% Authentic\nYou can trust this product as verified by Sakksh.")
+                    }
+                } else {
+                    onError("⚠️ Missing 'quality' field in response")
+                }
+
+            } else if (jsonElement.isJsonPrimitive) {
+                onError(jsonElement.asString)
+            } else {
+                onError("⚠️ Unexpected response format")
+            }
+
+        } catch (e: Exception) {
+            onError("❌ Network error: ${e.localizedMessage}")
+        } finally {
+            /*Todo*/
+        }
+    }
+
+    private fun showAuthScanResult(
+        raw: String,
+        message: String,
+        isError: Boolean,
+        parsedMap: List<GS1ParsedResult>
+    ) {
+        AuthResultDialog(
+            raw = raw,
+            message = message,
+            parsedData = parsedMap,
+            isError = isError,
+        ) {
+            // Resume scanning / navigate
+        }.show(
+            (lifecycleOwner as FragmentActivity).supportFragmentManager,
+            "AuthDialog"
+        )
+
+    }
+
+    private fun showScanResultBottomSheet(
+        raw: String,
+        parsedMap: List<GS1ParsedResult>
+    ) {
+        val bottomSheet = ScanResultBottomSheet(rawData = raw, parsedData = parsedMap)
+
+        val fragmentManager =
+            (lifecycleOwner as? FragmentActivity)?.supportFragmentManager
+                ?: return
+
+        bottomSheet.show(fragmentManager, "ScanResultBottomSheet")
+    }
 
     private fun onBarcodes(barcodes: List<Barcode>, meta: FrameMetadata) {
 //        if (analyzerStopped) return

@@ -26,7 +26,7 @@ class AuthOverlayView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : ConstraintLayout(context, attrs) {
 
-    val txtTitle: TextView
+//    val txtTitle: TextView
     val previewView: PreviewView
     val overlayView: OverlayView
     val btnGallery: ImageButton
@@ -38,7 +38,7 @@ class AuthOverlayView @JvmOverloads constructor(
     init {
         LayoutInflater.from(context).inflate(R.layout.single_scanner, this, true)
 
-        txtTitle = findViewById(R.id.txtTitle)
+//        txtTitle = findViewById(R.id.txtTitle)
         previewView = findViewById(R.id.previewView)
         overlayView = findViewById(R.id.overlayView)
         btnGallery = findViewById(R.id.btn_gallery)
