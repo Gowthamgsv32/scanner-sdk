@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="12dp"
+    app:cardBackgroundColor="#0F0F0F"
+    app:strokeColor="#33FFFFFF"
+    app:strokeWidth="1dp"
+    app:cardCornerRadius="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Top badges -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/txtBarcodeType"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Data Matrix"
+                android:textColor="#4DA3FF"
+                android:background="@drawable/bg_chip_blue"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="6dp"/>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="0dp"/>
+
+            <TextView
+                android:id="@+id/txtAuthStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Authentic Product"
+                android:textColor="@android:color/white"
+                android:background="@drawable/bg_chip_green"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="6dp"/>
+        </LinearLayout>
+
+        <!-- Scanned Code -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="Scanned Code"
+            android:textColor="#AAAAAA"
+            android:textSize="14sp"/>
+
+        <TextView
+            android:id="@+id/txtRawValue"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@android:color/white"
+            android:textSize="15sp"
+            android:layout_marginTop="4dp"/>
+
+        <!-- GS1 Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="📦 GS1 Parsed Data"
+            android:textColor="#AAAAAA"
+            android:textStyle="bold"/>
+
+        <!-- GTIN -->
+        <LinearLayout
+            android:layout_marginTop="10dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:id="@+id/txt_result_title"
+                android:text=""
+                android:textColor="@android:color/white"
+                android:layout_weight="1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/txtGtin"
+                android:textColor="@android:color/white"/>
+        </LinearLayout>
+
+        <!-- Batch -->
+        <LinearLayout
+            android:layout_marginTop="6dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:text="Batch/Lot Number"
+                android:textColor="@android:color/white"
+                android:layout_weight="1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/white"
+                android:id="@+id/txtBatch"/>
+        </LinearLayout>
+
+        <!-- Production -->
+        <LinearLayout
+            android:layout_marginTop="6dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:layout_height="wrap_content"
+                android:text="Production Date"
+                android:textColor="@android:color/white"
+                android:layout_weight="1"
+                android:layout_width="0dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/white"
+                android:id="@+id/txtProduction"/>
+        </LinearLayout>
+
+        <!-- Expiry -->
+        <LinearLayout
+            android:layout_marginTop="6dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:layout_height="wrap_content"
+                android:text="Expiration Date"
+                android:textColor="@android:color/white"
+                android:layout_weight="1"
+                android:layout_width="0dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/white"
+                android:id="@+id/txtExpiry"/>
+        </LinearLayout>
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

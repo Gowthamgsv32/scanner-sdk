@@ -7,4 +7,11 @@
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <application>
+        <activity
+            android:name=".customview.multi.BarcodeListActivity"
+            android:exported="false" />
+    </application>
+
 </manifest>

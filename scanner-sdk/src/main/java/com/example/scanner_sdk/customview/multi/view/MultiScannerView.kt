@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.camera.view.PreviewView
@@ -17,25 +18,27 @@ class MultiScannerView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : ConstraintLayout(context, attrs) {
 
-    val txtTitle: TextView
+    val scanCountTxt: TextView
     val previewView: PreviewView
     val multiOverlayView: MultiOverlayView
     val btnGallery: ImageButton
-//    val flashButton: ImageButton
-//    val zoomSeekBar: SeekBar
-/*    val singleScan: LinearLayout
-    val multiScan: LinearLayout*/
+    val flashButton: ImageButton
+    val cameraSwitch: ImageButton
+    val zoomPlus: ImageView
+    val zoomMinus: ImageView
+    val zoomPercentage: TextView
 
     init {
         LayoutInflater.from(context).inflate(R.layout.multi_scanner, this, true)
 
-        txtTitle = findViewById(R.id.multiTxtTitle)
         previewView = findViewById(R.id.multiPreviewView)
         multiOverlayView = findViewById(R.id.multiOverlayView)
         btnGallery = findViewById(R.id.multi_btn_gallery)
-//        flashButton = findViewById(R.id.btn_flash_toggle)
-//        zoomSeekBar = findViewById(R.id.zoom_seekbar)
-//        singleScan = findViewById(R.id.nav_single_scan)
-//        multiScan = findViewById(R.id.nav_multi_scan)
+        scanCountTxt = findViewById(R.id.scanCountTxt)
+        flashButton = findViewById(R.id.multi_btn_flash_toggle)
+        zoomPlus = findViewById(R.id.multiZoomPlus)
+        zoomMinus = findViewById(R.id.multiZoomMinus)
+        zoomPercentage = findViewById(R.id.multiZoomPercentage)
+        cameraSwitch = findViewById(R.id.multi_btn_camera_switch)
     }
 }
