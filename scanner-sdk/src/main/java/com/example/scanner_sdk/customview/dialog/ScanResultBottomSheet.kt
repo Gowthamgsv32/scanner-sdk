@@ -1,5 +1,6 @@
 package com.example.scanner_sdk.customview.dialog
 
+import android.content.DialogInterface
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -13,6 +14,7 @@ class ScanResultBottomSheet(
     private val rawData: String,
     private val parsedData:  List<GS1ParsedResult>
 ) : BottomSheetDialogFragment() {
+    var onDismissCallback: (() -> Unit)? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -50,5 +52,10 @@ class ScanResultBottomSheet(
         txtExpireDateValue.text = parsedData.getOrNull(3)?.value
 
         return view
+    }
+
+    override fun onDismiss(dialog: DialogInterface) {
+        super.onDismiss(dialog)
+        onDismissCallback?.invoke()
     }
 }

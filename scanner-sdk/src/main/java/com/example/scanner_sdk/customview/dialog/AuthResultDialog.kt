@@ -1,8 +1,8 @@
 package com.example.scanner_sdk.customview.dialog
 
 import android.app.Dialog
+import android.content.DialogInterface
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -10,6 +10,7 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toDrawable
 import androidx.fragment.app.DialogFragment
 import com.example.scanner_sdk.R
 import com.example.scanner_sdk.customview.model.GS1ParsedResult
@@ -25,7 +26,7 @@ class AuthResultDialog(
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val dialog = Dialog(requireContext())
         dialog.setContentView(R.layout.dialog_auth_result)
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        dialog.window?.setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
         dialog.window?.setLayout(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
@@ -39,7 +40,6 @@ class AuthResultDialog(
         val red = ContextCompat.getColor(dialog.context, R.color.red)
         val white = ContextCompat.getColor(dialog.context, R.color.white)
         val green = ContextCompat.getColor(dialog.context, R.color.light_green)
-        val black = ContextCompat.getColor(dialog.context, R.color.black)
 
         messageTxt.text = message
 
@@ -102,5 +102,10 @@ class AuthResultDialog(
         }
 
         return dialog
+    }
+
+    override fun onDismiss(dialog: DialogInterface) {
+        super.onDismiss(dialog)
+        onContinue()
     }
 }

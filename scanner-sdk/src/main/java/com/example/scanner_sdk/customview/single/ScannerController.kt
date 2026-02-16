@@ -63,6 +63,8 @@ class ScannerController(
     private val barCodeList = arrayListOf<String>()
     private var lensFacing = CameraSelector.LENS_FACING_BACK
     private var currentZoomRatio = 1f
+    private var isScanningPaused = false
+    private var barcodeAnalyzer: BarcodeAnalyzer? = null
     private var minZoom = 1f
     private var maxZoom = 5f
     private val ZOOM_STEP = 0.5f
@@ -134,25 +136,22 @@ class ScannerController(
             decreaseZoom()
         }
 
-        // Setup zoom control
-        /*singleScannerView?.zoomSeekBar?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    val zoomRatio = 1f + (progress / 100f) * 4f // Zoom range 1x to 5x
-                    camera?.cameraControl?.setZoomRatio(zoomRatio)
-                }
-            }
-
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })*/
-
         singleScannerView?.overlayView?.visibility = View.VISIBLE
 //        singleScannerView?.txtTitle?.text = "Single Scanner"
 
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
             cameraProvider = cameraProviderFuture.get()
+
+            barcodeAnalyzer = BarcodeAnalyzer(
+                onResults = { barcodes, meta ->
+
+                    if(isScanningPaused) return@BarcodeAnalyzer
+
+                    singleScannerView?.overlayView?.setResults(barcodes, meta)
+                    handleSingleScan(barcodes)
+                },
+            )
 
             val preview = Preview.Builder()
                 .setTargetResolution(Size(1920, 1080))
@@ -164,15 +163,7 @@ class ScannerController(
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
 
-            imageAnalysis?.setAnalyzer(
-                executor,
-                BarcodeAnalyzer(
-                    onResults = { barcodes, meta ->
-                        singleScannerView?.overlayView?.setResults(barcodes, meta)
-                        handleSingleScan(barcodes)
-                    },
-                )
-            )
+            barcodeAnalyzer?.let { imageAnalysis?.setAnalyzer(executor, it) }
 
             cameraProvider?.unbindAll()
 
@@ -274,6 +265,16 @@ class ScannerController(
         cameraProviderFuture.addListener({
             cameraProvider = cameraProviderFuture.get()
 
+            barcodeAnalyzer = BarcodeAnalyzer(
+                onResults = { barcodes, meta ->
+                    if(isScanningPaused) return@BarcodeAnalyzer
+
+                    authScannerView?.overlayView?.setResults(barcodes, meta)
+
+                    handleAuthScan(barcodes)
+                },
+            )
+
             val preview = Preview.Builder()
                 .setTargetResolution(Size(1920, 1080))
                 .build()
@@ -284,15 +285,7 @@ class ScannerController(
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
 
-            imageAnalysis?.setAnalyzer(
-                executor,
-                BarcodeAnalyzer(
-                    onResults = { barcodes, meta ->
-                        authScannerView?.overlayView?.setResults(barcodes, meta)
-                        handleAuthScan(barcodes)
-                    },
-                )
-            )
+            barcodeAnalyzer?.let { imageAnalysis?.setAnalyzer(executor, it) }
 
             cameraProvider?.unbindAll()
 
@@ -402,19 +395,16 @@ class ScannerController(
         }, ContextCompat.getMainExecutor(context))
     }
     private fun handleSingleScan(barcodes: List<Barcode>) {
-        val barcodes = barcodes.firstOrNull()?: return
-        val raw = barcodes.rawValue ?: return
+        if(barcodes.isEmpty()) return
 
-        if (raw == lastValue) return
-        lastValue = raw
+        val firstBarcode = barcodes.firstOrNull()?: return
+        val raw = firstBarcode.rawValue ?: return
 
-//        onScanned(raw)
+        isScanningPaused = true
+
         val (parsed, barcode, encrypted) = parseBarcodeLikeMultiScan(raw)
-// Stop repeated scanning
-        lastValue = raw
 
         showScanResultBottomSheet(raw = barcode, parsedMap = parsed)
-//        handleAuthenticationResult(raw, barcodes.format)
     }
 
     private fun bindCamera(
@@ -440,13 +430,10 @@ class ScannerController(
         val barcodes = barcodes.firstOrNull()?: return
         val raw = barcodes.rawValue ?: return
 
-        if (raw == lastValue) return
-        lastValue = raw
+        isScanningPaused = true
+        imageAnalysis?.clearAnalyzer()
 
-//        onScanned(raw)
         val result = parseBarcodeLikeMultiScanForAuth(raw)
-// Stop repeated scanning
-        lastValue = raw
 
         lifecycleOwner.lifecycleScope.launch {
             authenticateBarcode(
@@ -566,7 +553,8 @@ class ScannerController(
             parsedData = parsedMap,
             isError = isError,
         ) {
-            // Resume scanning / navigate
+            isScanningPaused = false
+            barcodeAnalyzer?.let { imageAnalysis?.setAnalyzer(executor, it) }
         }.show(
             (lifecycleOwner as FragmentActivity).supportFragmentManager,
             "AuthDialog"
@@ -585,6 +573,11 @@ class ScannerController(
                 ?: return
 
         bottomSheet.show(fragmentManager, "ScanResultBottomSheet")
+
+        bottomSheet.onDismissCallback = {
+            isScanningPaused = false
+            barcodeAnalyzer?.let { imageAnalysis?.setAnalyzer(executor, it) }
+        }
     }
 
     private fun onBarcodes(barcodes: List<Barcode>, meta: FrameMetadata) {
