@@ -17,6 +17,7 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.example.scanner_sdk.customview.BarcodeDataProcessor
@@ -51,6 +52,7 @@ class ScannerController(
     private val multiScannerView: MultiScannerView? = null,
     private val authScannerView: AuthScannerView? = null,
     private val lifecycleOwner: LifecycleOwner,
+    private val fragmentManager: FragmentManager, // 👈 ADD THIS
     private val onScanned: (String) -> Unit
 ) {
     private var lastLogTime = System.currentTimeMillis()
@@ -461,6 +463,11 @@ class ScannerController(
 
 //        handleAuthenticationResult(raw, barcodes.format)
     }
+    fun stop() {
+        imageAnalysis?.clearAnalyzer()
+        cameraProvider?.unbindAll()
+        camera = null
+    }
 
     suspend fun authenticateBarcode(
         barcode: String,
@@ -555,10 +562,7 @@ class ScannerController(
         ) {
             isScanningPaused = false
             barcodeAnalyzer?.let { imageAnalysis?.setAnalyzer(executor, it) }
-        }.show(
-            (lifecycleOwner as FragmentActivity).supportFragmentManager,
-            "AuthDialog"
-        )
+        }.show(fragmentManager, "AuthDialog")
 
     }
 
@@ -567,10 +571,6 @@ class ScannerController(
         parsedMap: List<GS1ParsedResult>
     ) {
         val bottomSheet = ScanResultBottomSheet(rawData = raw, parsedData = parsedMap)
-
-        val fragmentManager =
-            (lifecycleOwner as? FragmentActivity)?.supportFragmentManager
-                ?: return
 
         bottomSheet.show(fragmentManager, "ScanResultBottomSheet")
 
