@@ -143,6 +143,7 @@
         android:text="Scanned Count : "
         android:textColor="@color/white"
         android:textSize="16sp"
+        android:padding="6dp"
         android:background="@drawable/rounded_bg"
         android:layout_marginBottom="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
