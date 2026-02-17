@@ -3,7 +3,7 @@ package com.example.scanner_sdk.customview.multi
 import android.os.Bundle
 import android.view.View
 import android.widget.ProgressBar
-import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -24,7 +24,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
-class BarcodeListActivity : AppCompatActivity() {
+class BarcodeListActivity : FragmentActivity() {
 
     private val authBarCodeList = mutableListOf<ParsedAuthBarcode>()
     private val barCodeResultList = mutableListOf<ScannedItem>()
