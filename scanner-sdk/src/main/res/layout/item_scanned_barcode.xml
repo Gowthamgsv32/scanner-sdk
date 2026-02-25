@@ -27,7 +27,7 @@
                 android:id="@+id/txtBarcodeType"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Data Matrix"
+                android:text=""
                 android:textColor="#4DA3FF"
                 android:background="@drawable/bg_chip_blue"
                 android:paddingHorizontal="14dp"
@@ -54,7 +54,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
-            android:text="Scanned Code"
+            android:text="Raw Data"
             android:textColor="#AAAAAA"
             android:textSize="14sp"/>
 
@@ -75,86 +75,11 @@
             android:textColor="#AAAAAA"
             android:textStyle="bold"/>
 
-        <!-- GTIN -->
         <LinearLayout
-            android:layout_marginTop="10dp"
+            android:id="@+id/containerParsedValues"
+            android:orientation="vertical"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
-            <TextView
-                android:id="@+id/txt_result_title"
-                android:text=""
-                android:textColor="@android:color/white"
-                android:layout_weight="1"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:id="@+id/txtGtin"
-                android:textColor="@android:color/white"/>
-        </LinearLayout>
-
-        <!-- Batch -->
-        <LinearLayout
-            android:layout_marginTop="6dp"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
-            <TextView
-                android:text="Batch/Lot Number"
-                android:textColor="@android:color/white"
-                android:layout_weight="1"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@android:color/white"
-                android:id="@+id/txtBatch"/>
-        </LinearLayout>
-
-        <!-- Production -->
-        <LinearLayout
-            android:layout_marginTop="6dp"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
-            <TextView
-                android:layout_height="wrap_content"
-                android:text="Production Date"
-                android:textColor="@android:color/white"
-                android:layout_weight="1"
-                android:layout_width="0dp"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@android:color/white"
-                android:id="@+id/txtProduction"/>
-        </LinearLayout>
-
-        <!-- Expiry -->
-        <LinearLayout
-            android:layout_marginTop="6dp"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
-            <TextView
-                android:layout_height="wrap_content"
-                android:text="Expiration Date"
-                android:textColor="@android:color/white"
-                android:layout_weight="1"
-                android:layout_width="0dp"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@android:color/white"
-                android:id="@+id/txtExpiry"/>
-        </LinearLayout>
+            android:layout_height="wrap_content"/>
 
     </LinearLayout>
 

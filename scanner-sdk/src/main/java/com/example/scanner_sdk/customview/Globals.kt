@@ -52,7 +52,7 @@ fun parseBarcodeLikeMultiScan(value: String): Triple<
         String,
         String
         > {
-
+    Log.d("BARCODESCANNERLOG", value)
     // ✅ 1. Digital Link should ALWAYS be parsed
     if (value.startsWith("http")) {
 
@@ -323,7 +323,9 @@ val aiMetadata: Map<String, Triple<String, Int?, Boolean>> = mapOf(
     "99" to Triple("Company Internal", null, true)
 )
 
-fun parseBarcodeLikeMultiScanForAuth(value: String): ParsedAuthBarcode {
+fun parseBarcodeLikeMultiScanForAuth(value: String, type: String): ParsedAuthBarcode {
+
+    val splitted = GS1Utils.splitByAI98(value)
 
     val parseGS1Results = GS1Parser.parseGS1(value)
 
@@ -354,24 +356,26 @@ fun parseBarcodeLikeMultiScanForAuth(value: String): ParsedAuthBarcode {
                 barcodeData = splitted.barcodeData,
                 encryptedText = splitted.encryptedText,
                 isGeneratedBySystem = true,
-                companyId = splitted.companyId
+                companyId = splitted.companyId,
+                type = type,
             )
         } else {
             // ✅ Valid GS1 Digital Link, but NOT system-generated
             ParsedAuthBarcode(
                 parsedResults = normalizedParsed,
-                barcodeData = "",
+                barcodeData = value,
                 encryptedText = "",
                 isGeneratedBySystem = false,
-                companyId = ""
+                companyId = "",
+                type = type,
             )
         }
     }
 
     // ---------- NORMAL GS1 ----------
-    val splitted = GS1Utils.splitByAI98(
+/*    val splitted = GS1Utils.splitByAI98(
         parsing.originalWithout98
-    )
+    )*/
 
     if (splitted != null) {
         return ParsedAuthBarcode(
@@ -379,17 +383,19 @@ fun parseBarcodeLikeMultiScanForAuth(value: String): ParsedAuthBarcode {
             barcodeData = splitted.barcodeData,
             encryptedText = splitted.encryptedText,
             isGeneratedBySystem = true,
-            companyId = splitted.companyId
+            companyId = splitted.companyId,
+            type = type,
         )
     }
 
     // ---------- PLAIN GS1 ----------
     return ParsedAuthBarcode(
         parsedResults = parseGS1Results,
-        barcodeData = "",
+        barcodeData = value,
         encryptedText = "",
         isGeneratedBySystem = false,
-        companyId = ""
+        companyId = "",
+        type = type,
     )
 }
 
@@ -631,17 +637,18 @@ fun parseGS1Temp(data: String): List<GS1ParsedResult> {
     return results
 }
 
-object GS1Parser {
+object GS1ParserTest {
 
     private const val FNC1 = 29.toChar()
 
     // =====================================================
-    // AI DICTIONARY
+    // AI DICTIONARY (YOUR ORIGINAL STYLE)
     // =====================================================
 
     private val aiDict = mapOf(
         "00" to Triple("SSCC", 18, false),
         "01" to Triple("GTIN", 14, false),
+        "02" to Triple("Contained GTIN", 14, false), // ⭐ IMPORTANT ADD
         "10" to Triple("Batch/Lot Number", null, true),
         "11" to Triple("Production Date", 6, false),
         "15" to Triple("Best Before Date", 6, false),
@@ -689,20 +696,21 @@ object GS1Parser {
     }
 
     // =====================================================
-    // PREPROCESSING (🔥 MOST IMPORTANT)
+    // 🔥 INDUSTRIAL PREPROCESS (MAJOR FIXES)
     // =====================================================
 
     private fun preprocess(data: String): String {
 
         var input = data
 
-        // ✅ Remove Symbology Identifier  ]C1 ]d2 ]Q3
+        // ✅ Remove Symbology Identifier (]C1 ]d2 ]Q3 etc)
         if (input.startsWith("]") && input.length > 3) {
             input = input.substring(3)
         }
 
-        // ✅ Keep printable chars + FNC1
+        // ✅ Remove weird leading control chars except FNC1
         val sb = StringBuilder()
+
         input.forEach {
             if (it == FNC1 || it.code >= 32) {
                 sb.append(it)
@@ -713,7 +721,7 @@ object GS1Parser {
     }
 
     // =====================================================
-    // BRACKETED MODE
+    // BRACKETED MODE (UNCHANGED)
     // =====================================================
 
     private fun parseBracketed(data: String): List<GS1ParsedResult> {
@@ -738,7 +746,7 @@ object GS1Parser {
     }
 
     // =====================================================
-    // PLAIN GS1 MODE
+    // 🔥 FULLY HARDENED PLAIN MODE
     // =====================================================
 
     private fun parsePlain(input: String): List<GS1ParsedResult> {
@@ -746,16 +754,19 @@ object GS1Parser {
         val results = mutableListOf<GS1ParsedResult>()
 
         var index = 0
-
         val hasFNC1 = input.contains(FNC1)
 
         fun looksLikeAI(idx: Int): String? {
 
+            // ⭐ Skip FNC1 BEFORE detecting AI
+            var i = idx
+            while (i < input.length && input[i] == FNC1) i++
+
             for (len in listOf(4,3,2)) {
 
-                if (idx + len > input.length) continue
+                if (i + len > input.length) continue
 
-                val candidate = input.substring(idx, idx + len)
+                val candidate = input.substring(i, i + len)
 
                 if (aiDict.containsKey(candidate)) return candidate
 
@@ -783,15 +794,23 @@ object GS1Parser {
 
         while (index < input.length) {
 
-            // ✅ Skip ANY FNC1 (start/middle/end)
+            // ⭐ Skip ANY FNC1 anywhere
             while (index < input.length && input[index] == FNC1) {
                 index++
             }
 
             if (index >= input.length) break
 
-            val ai = looksLikeAI(index) ?: break
-            if (shouldIgnoreAI(ai)) break
+            val ai = looksLikeAI(index) ?: run {
+                // ⭐ NEW: Skip unknown characters instead of breaking
+                index++
+                continue
+            }
+
+            if (shouldIgnoreAI(ai)) {
+                index += ai.length
+                continue
+            }
 
             index += ai.length
 
@@ -874,5 +893,880 @@ object GS1Parser {
         }
 
         return results
+    }
+}
+
+object GS1ParserV2 {
+
+    private const val FNC1 = 29.toChar()
+
+    private val aiDict = mapOf(
+        "00" to Pair("SSCC",18),
+        "01" to Pair("GTIN",14),
+        "02" to Pair("Contained GTIN",14),
+        "10" to Pair("Batch/Lot Number",null),
+        "11" to Pair("Production Date",6),
+        "15" to Pair("Best Before Date",6),
+        "17" to Pair("Expiration Date",6),
+        "20" to Pair("Internal Product Variant",2),
+        "21" to Pair("Serial Number",null),
+        "30" to Pair("Variable Count",null),
+        "37" to Pair("Count of Trade Items",null),
+        "410" to Pair("Ship To GLN",13),
+        "411" to Pair("Bill To GLN",13),
+        "414" to Pair("Physical Location GLN",13),
+        "420" to Pair("Postal Code",null),
+        "421" to Pair("Postal Code + ISO Country",null)
+    )
+
+    private val measurementRange = 310..369
+    private val monetaryRange = 390..395
+
+    fun parse(raw: String): List<GS1ParsedResult> {
+
+        if (raw.isEmpty()) return emptyList()
+
+        val input = preprocess(raw).toCharArray()
+
+        val results = ArrayList<GS1ParsedResult>(6)
+
+        var i = 0
+        val size = input.size
+
+        while (i < size) {
+
+            // ⭐ skip any FNC1 quickly
+            while (i < size && input[i] == FNC1) i++
+            if (i >= size) break
+
+            val aiStart = i
+
+            val ai = detectAI(input, i, size) ?: run {
+                i++
+                continue
+            }
+
+            i += ai.length
+
+            val meta = aiDict[ai]
+            val prefix3 = ai.take(3).toIntOrNull()
+
+            // ======================================
+            // Measurement AI 310n–369n
+            // ======================================
+            if (ai.length == 4 && prefix3 != null && prefix3 in measurementRange) {
+
+                if (i + 6 > size) break
+
+                val value = String(input, i, 6)
+                results.add(GS1ParsedResult(ai, value, "Measurement"))
+
+                i += 6
+                continue
+            }
+
+            // ======================================
+            // Monetary AI 390n–395n
+            // ======================================
+            if (ai.length == 4 && prefix3 != null && prefix3 in monetaryRange) {
+
+                val start = i
+
+                while (i < size && input[i] != FNC1) {
+                    i++
+                }
+
+                val value = String(input, start, i - start)
+                results.add(GS1ParsedResult(ai, value, "Monetary Amount"))
+
+                continue
+            }
+
+            // ======================================
+            // NORMAL AI
+            // ======================================
+            if (meta != null) {
+
+                val (desc, fixedLen) = meta
+
+                if (fixedLen != null) {
+
+                    if (i + fixedLen > size) break
+
+                    val value = String(input, i, fixedLen)
+                    results.add(GS1ParsedResult(ai, value, desc))
+
+                    i += fixedLen
+
+                } else {
+
+                    val start = i
+
+                    while (i < size && input[i] != FNC1) {
+                        // stop if next AI detected
+                        if (detectAI(input, i, size) != null) break
+                        i++
+                    }
+
+                    val value = String(input, start, i - start)
+                    results.add(GS1ParsedResult(ai, value, desc))
+                }
+            }
+        }
+
+        return results
+    }
+
+    // =====================================================
+    // 🔥 SUPER FAST AI DETECTOR (NO substring)
+    // =====================================================
+
+    private fun detectAI(chars: CharArray, idx: Int, size: Int): String? {
+
+        fun read(len: Int): String? {
+            if (idx + len > size) return null
+            for (k in 0 until len) {
+                if (!chars[idx + k].isDigit()) return null
+            }
+            return String(chars, idx, len)
+        }
+
+        // try 4-digit AI
+        read(4)?.let { ai ->
+            val prefix3 = ai.substring(0,3).toIntOrNull()
+            if (aiDict.containsKey(ai)) return ai
+            if (prefix3 != null && (prefix3 in measurementRange || prefix3 in monetaryRange)) return ai
+        }
+
+        // try 3-digit
+        read(3)?.let {
+            if (aiDict.containsKey(it)) return it
+        }
+
+        // try 2-digit
+        read(2)?.let {
+            if (aiDict.containsKey(it)) return it
+            val num = it.toIntOrNull()
+            if (num != null && num in 91..99) return it
+        }
+
+        return null
+    }
+
+    // =====================================================
+    // PREPROCESS RAW SCANNER DATA
+    // =====================================================
+
+    private fun preprocess(data: String): String {
+
+        var input = data
+
+        // remove ]C1 ]d2 etc
+        if (input.startsWith("]") && input.length > 3) {
+            input = input.substring(3)
+        }
+
+        val sb = StringBuilder(input.length)
+
+        input.forEach {
+            if (it == FNC1 || it.code >= 32) {
+                sb.append(it)
+            }
+        }
+
+        return sb.toString()
+    }
+}
+
+object GS1ParserV3 {
+
+    private const val FNC1 = 29.toChar()
+
+    private val aiDict = mapOf(
+        "00" to Pair("SSCC",18),
+        "01" to Pair("GTIN",14),
+        "02" to Pair("Contained GTIN",14),
+        "10" to Pair("Batch/Lot Number",null),
+        "11" to Pair("Production Date",6),
+        "15" to Pair("Best Before Date",6),
+        "17" to Pair("Expiration Date",6),
+        "20" to Pair("Internal Product Variant",2),
+        "21" to Pair("Serial Number",null),
+        "30" to Pair("Variable Count",null),
+        "37" to Pair("Count of Trade Items",null),
+        "410" to Pair("Ship To GLN",13),
+        "411" to Pair("Bill To GLN",13),
+        "414" to Pair("Physical Location GLN",13),
+        "420" to Pair("Postal Code",null),
+        "421" to Pair("Postal Code + ISO Country",null)
+    )
+
+    private val measurementRange = 310..369
+    private val monetaryRange = 390..395
+
+    // =====================================================
+    // PUBLIC ENTRY
+    // =====================================================
+
+    fun parse(raw: String): List<GS1ParsedResult> {
+
+        if (raw.isEmpty()) return emptyList()
+
+        val input = preprocess(raw).toCharArray()
+        val results = ArrayList<GS1ParsedResult>(8)
+
+        var i = 0
+        val size = input.size
+
+        while (i < size) {
+
+            // Skip any FNC1 safely
+            while (i < size && input[i] == FNC1) i++
+            if (i >= size) break
+
+            val ai = detectAI(input, i, size)
+
+            // ⭐ STREAM SAFE: never break
+            if (ai == null) {
+                i++
+                continue
+            }
+
+            val aiStart = i
+            i += ai.length
+
+            val prefix3 = ai.take(3).toIntOrNull()
+            val meta = aiDict[ai]
+
+            // ======================================
+            // Measurement AI
+            // ======================================
+            if (ai.length == 4 && prefix3 != null && prefix3 in measurementRange) {
+
+                if (i + 6 <= size) {
+                    val value = String(input, i, 6)
+                    results.add(GS1ParsedResult(ai, value, "Measurement"))
+                    i += 6
+                }
+
+                continue
+            }
+
+            // ======================================
+            // Monetary AI
+            // ======================================
+            if (ai.length == 4 && prefix3 != null && prefix3 in monetaryRange) {
+
+                val start = i
+
+                while (i < size && input[i] != FNC1) i++
+
+                val value = String(input, start, i - start)
+                results.add(GS1ParsedResult(ai, value, "Monetary Amount"))
+                continue
+            }
+
+            // ======================================
+            // NORMAL AI
+            // ======================================
+            if (meta != null) {
+
+                val (desc, fixedLen) = meta
+
+                if (fixedLen != null) {
+
+                    if (i + fixedLen <= size) {
+
+                        val value = String(input, i, fixedLen)
+                        results.add(GS1ParsedResult(ai, value, desc))
+
+                        i += fixedLen
+                    } else {
+                        // incomplete value — skip safely
+                        i = aiStart + 1
+                    }
+
+                } else {
+
+                    val start = i
+
+                    while (i < size) {
+
+                        if (input[i] == FNC1) break
+
+                        // detect next AI safely
+                        val nextAI = detectAI(input, i, size)
+                        if (nextAI != null) break
+
+                        i++
+                    }
+
+                    val value = String(input, start, i - start)
+                    results.add(GS1ParsedResult(ai, value, desc))
+                }
+            } else {
+                // unknown AI → continue scanning
+                i = aiStart + 1
+            }
+        }
+
+        return results
+    }
+
+    // =====================================================
+    // SUPER FAST AI DETECTOR (STREAM SAFE)
+    // =====================================================
+
+    private fun detectAI(chars: CharArray, idx: Int, size: Int): String? {
+
+        fun read(len: Int): String? {
+            if (idx + len > size) return null
+            for (k in 0 until len) {
+                if (!chars[idx + k].isDigit()) return null
+            }
+            return String(chars, idx, len)
+        }
+
+        read(4)?.let { ai ->
+            val prefix3 = ai.substring(0,3).toIntOrNull()
+            if (aiDict.containsKey(ai)) return ai
+            if (prefix3 != null && (prefix3 in measurementRange || prefix3 in monetaryRange)) return ai
+        }
+
+        read(3)?.let {
+            if (aiDict.containsKey(it)) return it
+        }
+
+        read(2)?.let {
+            if (aiDict.containsKey(it)) return it
+            val num = it.toIntOrNull()
+            if (num != null && num in 91..99) return it
+        }
+
+        return null
+    }
+
+    // =====================================================
+    // PREPROCESS RAW SCANNER DATA
+    // =====================================================
+
+    private fun preprocess(data: String): String {
+
+        var input = data
+
+        // Remove symbology identifier ]C1 ]d2 ]Q3
+        if (input.startsWith("]") && input.length > 3) {
+            input = input.substring(3)
+        }
+
+        val sb = StringBuilder(input.length)
+
+        input.forEach {
+            if (it == FNC1 || it.code >= 32) {
+                sb.append(it)
+            }
+        }
+
+        return sb.toString()
+    }
+}
+
+object GS1Parser {
+
+    private const val FNC1 = 29.toChar()
+
+    private val aiDict = mapOf(
+
+        // Logistic / Trade Identification
+        "00" to Pair("SSCC",18),
+        "01" to Pair("GTIN",14),
+        "02" to Pair("Contained GTIN",14),
+        "10" to Pair("Batch/Lot Number",null),
+        "11" to Pair("Production Date",6),
+        "12" to Pair("Due Date",6),
+        "13" to Pair("Packaging Date",6),
+        "15" to Pair("Best Before Date",6),
+        "16" to Pair("Sell By Date",6),
+        "17" to Pair("Expiration Date",6),
+        "20" to Pair("Internal Product Variant",2),
+        "21" to Pair("Serial Number",null),
+        "22" to Pair("Consumer Product Variant",null),
+        "30" to Pair("Variable Count",null),
+        "37" to Pair("Count of Trade Items",null),
+
+        // Additional Identification
+        "235" to Pair("TPX – Third Party GTIN Extension",null),
+        "240" to Pair("Additional Product Identification",null),
+        "241" to Pair("Customer Part Number",null),
+        "242" to Pair("Made-to-Order Variation",null),
+        "243" to Pair("Packaging Component Number",null),
+        "250" to Pair("Secondary Serial Number",null),
+        "251" to Pair("Reference to Source Entity",null),
+        "253" to Pair("Global Document Type Identifier (GDTI)",null),
+        "254" to Pair("GLN Extension Component",null),
+        "255" to Pair("Global Coupon Number (GCN)",null),
+
+        // Shipment / Consignment
+        "400" to Pair("Customer PO Number",null),
+        "401" to Pair("GINC",null),
+        "402" to Pair("GSIN",17),
+        "403" to Pair("Routing Code",null),
+
+        // GLN
+        "410" to Pair("Ship To GLN",13),
+        "411" to Pair("Bill To GLN",13),
+        "412" to Pair("Purchased From GLN",13),
+        "413" to Pair("Ship For GLN",13),
+        "414" to Pair("Physical Location GLN",13),
+        "415" to Pair("Invoicing Party GLN",13),
+        "416" to Pair("Production Location GLN",13),
+        "417" to Pair("Party GLN",13),
+
+        // Country / Postal
+        "420" to Pair("Postal Code",null),
+        "421" to Pair("Postal Code + ISO Country",null),
+        "422" to Pair("Country of Origin",3),
+        "423" to Pair("Country of Initial Processing",null),
+        "424" to Pair("Country of Processing",3),
+        "425" to Pair("Country of Disassembly",null),
+        "426" to Pair("Full Process Chain Country",3),
+        "427" to Pair("Country Subdivision",null),
+
+        // Temperature
+        "4330" to Pair("Max Temp Fahrenheit",6),
+        "4331" to Pair("Max Temp Celsius",6),
+        "4332" to Pair("Min Temp Fahrenheit",6),
+        "4333" to Pair("Min Temp Celsius",6),
+
+        // Asset Identification
+        "8001" to Pair("Roll Product Info",14),
+        "8002" to Pair("Mobile Identifier",null),
+        "8003" to Pair("GRAI",null),
+        "8004" to Pair("GIAI",null),
+        "8005" to Pair("Price Per Unit",6),
+        "8006" to Pair("ITIP Piece",18),
+        "8007" to Pair("IBAN",null),
+        "8008" to Pair("Production Date & Time",null),
+        "8009" to Pair("Sensor Indicator",null),
+        "8010" to Pair("Component Part ID",null),
+        "8011" to Pair("Component Serial",null),
+        "8012" to Pair("Software Version",null),
+        "8013" to Pair("Global Model Number",null),
+        "8017" to Pair("GSRN Provider",18),
+        "8018" to Pair("GSRN Recipient",18),
+        "8019" to Pair("Service Relation Instance",null),
+        "8020" to Pair("Payment Slip Reference",null),
+        "8026" to Pair("ITIP Contained Pieces",18),
+        "8030" to Pair("Digital Signature",null),
+        "8200" to Pair("Extended Packaging URL",null),
+
+        // Healthcare
+        "7001" to Pair("NATO Stock Number",13),
+        "7002" to Pair("UNECE Meat Classification",null),
+        "7003" to Pair("Expiration Date & Time",10),
+        "7004" to Pair("Active Potency",null),
+        "7005" to Pair("Catch Area",null),
+        "7006" to Pair("First Freeze Date",6),
+        "7007" to Pair("Harvest Date",null),
+        "7008" to Pair("Species Code",null),
+        "7009" to Pair("Fishing Gear Type",null),
+        "7010" to Pair("Production Method",null),
+        "7011" to Pair("Test By Date",null),
+        "7020" to Pair("Refurbishment Lot ID",null),
+        "7021" to Pair("Functional Status",null),
+        "7022" to Pair("Revision Status",null),
+        "7023" to Pair("GIAI Assembly",null),
+
+        // Company Internal
+        "91" to Pair("Company Internal 91",null),
+        "92" to Pair("Company Internal 92",null),
+        "93" to Pair("Company Internal 93",null),
+        "94" to Pair("Company Internal 94",null),
+        "95" to Pair("Company Internal 95",null),
+        "96" to Pair("Company Internal 96",null),
+        "97" to Pair("Company Internal 97",null),
+        "98" to Pair("Company Internal 98",null),
+        "99" to Pair("Company Internal 99",null)
+    )
+
+    // =====================================================
+    // PUBLIC ENTRY (same flow as Swift)
+    // =====================================================
+
+    fun parseGS1(data: String): List<GS1ParsedResult> {
+
+        val cleaned = preprocess(data)
+
+        return if (cleaned.contains("(")) {
+            parseBracketed(cleaned)
+        } else {
+            parsePlain(cleaned)
+        }
+    }
+
+    // =====================================================
+    // PREPROCESS RAW SCANNER DATA
+    // =====================================================
+
+    private fun preprocess(data: String): String {
+
+        var input = data
+
+        // Remove ]C1 ]d2 ]Q3 symbology
+        if (input.startsWith("]") && input.length > 3) {
+            input = input.substring(3)
+        }
+
+        val sb = StringBuilder(input.length)
+
+        input.forEach {
+            if (it == FNC1 || it.code >= 32) {
+                sb.append(it)
+            }
+        }
+
+        return sb.toString()
+    }
+
+    // =====================================================
+    // BRACKETED MODE (same as Swift)
+    // =====================================================
+
+    private fun parseBracketed(data: String): List<GS1ParsedResult> {
+
+        val regex = Regex("""\((\d{2,4})\)([^\(]+)""")
+
+        return regex.findAll(data).map {
+
+            val ai = it.groupValues[1]
+            val value = it.groupValues[2]
+
+            GS1ParsedResult(
+                ai,
+                value,
+                aiDict[ai]?.first ?: "Unknown AI"
+            )
+        }.toList()
+    }
+
+    // =====================================================
+    // PLAIN GS1 MODE — SWIFT COMPATIBLE
+    // =====================================================
+
+    private fun parsePlain(input: String): List<GS1ParsedResult> {
+
+        val results = mutableListOf<GS1ParsedResult>()
+
+        var index = 0
+        val size = input.length
+        val hasFNC1 = input.contains(FNC1)
+
+        fun looksLikeAI(pos: Int): String? {
+
+            for (len in listOf(4,3,2)) {
+
+                if (pos + len > size) continue
+
+                val candidate = input.substring(pos, pos + len)
+
+                if (aiDict.containsKey(candidate)) return candidate
+
+                val num = candidate.toIntOrNull()
+                if (len == 2 && num != null && num in 91..99) return candidate
+
+                if (len == 4) {
+                    val prefix3 = candidate.take(3).toIntOrNull()
+                    if (prefix3 != null && prefix3 in 310..369) return candidate
+                    if (prefix3 != null && prefix3 in 390..395) return candidate
+                }
+            }
+
+            return null
+        }
+
+        while (index < size) {
+
+            // Skip any FNC1
+            while (index < size && input[index] == FNC1) index++
+            if (index >= size) break
+
+            val ai = looksLikeAI(index) ?: run {
+                index++
+                continue
+            }
+
+            index += ai.length
+
+            val meta = aiDict[ai]
+            val fixedLen = meta?.second
+
+            // =====================================
+            // FIXED LENGTH AI (same as Swift)
+            // =====================================
+            if (fixedLen != null) {
+
+                if (index + fixedLen > size) break
+
+                val value = input.substring(index, index + fixedLen)
+
+                results.add(
+                    GS1ParsedResult(ai, value, meta.first)
+                )
+
+                index += fixedLen
+            }
+            // =====================================
+            // VARIABLE LENGTH AI — STRICT BOUNDARY
+            // =====================================
+            else {
+
+                val start = index
+
+                while (index < size) {
+
+                    if (hasFNC1 && input[index] == FNC1) break
+
+                    // ⭐ STRICT SWIFT RULE
+                    val nextAI = looksLikeAI(index)
+                    if (!hasFNC1 && nextAI != null && index > start) break
+
+                    index++
+                }
+
+                val value = input.substring(start, index)
+
+                results.add(
+                    GS1ParsedResult(
+                        ai,
+                        value,
+                        meta?.first ?: "AI $ai"
+                    )
+                )
+            }
+        }
+
+        return results
+    }
+}
+
+object GS1AutoParser {
+
+    private const val FNC1 = 29.toChar()
+
+    // =====================================================
+    // PUBLIC ENTRY
+    // =====================================================
+
+    fun parse(raw: String): List<GS1ParsedResult> {
+
+        if (raw.isEmpty()) return emptyList()
+
+        val cleaned = preprocess(raw)
+
+        return if (cleaned.contains("(")) {
+            parseBracketed(cleaned)
+        } else {
+            parsePlain(cleaned)
+        }
+    }
+
+    // =====================================================
+    // PREPROCESSING
+    // =====================================================
+
+    private fun preprocess(data: String): String {
+
+        var input = data
+
+        // Remove symbology identifier ]C1 ]d2 ]Q3 etc
+        if (input.startsWith("]") && input.length > 3) {
+            input = input.substring(3)
+        }
+
+        val sb = StringBuilder()
+
+        input.forEach {
+            if (it == FNC1 || it.code >= 32) {
+                sb.append(it)
+            }
+        }
+
+        return sb.toString()
+    }
+
+    // =====================================================
+    // BRACKETED MODE (AUTO)
+    // =====================================================
+
+    private fun parseBracketed(data: String): List<GS1ParsedResult> {
+
+        val regex = Regex("""\((\d{2,4})\)([^\(]+)""")
+        val results = mutableListOf<GS1ParsedResult>()
+
+        regex.findAll(data).forEach {
+
+            val ai = it.groupValues[1]
+            val value = it.groupValues[2]
+
+            results.add(
+                GS1ParsedResult(
+                    ai = ai,
+                    value = value,
+                    description = autoDescription(ai)
+                )
+            )
+        }
+
+        return results
+    }
+
+    // =====================================================
+    // AUTO AI DETECTOR
+    // =====================================================
+
+    private fun detectAI(input: String, index: Int): String? {
+
+        // Try longest first (GS1 rule)
+        for (len in listOf(4,3,2)) {
+
+            if (index + len > input.length) continue
+
+            val ai = input.substring(index, index + len)
+
+            if (!ai.all { it.isDigit() }) continue
+
+            val prefix3 = ai.take(3).toIntOrNull()
+
+            // Measurement 310n–369n
+            if (len == 4 && prefix3 != null && prefix3 in 310..369) return ai
+
+            // Monetary 390n–395n
+            if (len == 4 && prefix3 != null && prefix3 in 390..395) return ai
+
+            // General GS1 AI rule:
+            // valid if starts with 0–9 and length 2–4
+            if (len >= 2) return ai
+        }
+
+        return null
+    }
+
+    // =====================================================
+    // FIXED LENGTH RULES (GS1 SPEC)
+    // =====================================================
+
+    private fun fixedLength(ai: String): Int? {
+
+        return when (ai) {
+
+            "00" -> 18
+            "01","02" -> 14
+            "11","12","13","15","16","17" -> 6
+            "20" -> 2
+            "410","411","412","413","414","415","416","417" -> 13
+            "422","424","426" -> 3
+            "7001" -> 13
+
+            else -> {
+
+                val prefix3 = ai.take(3).toIntOrNull()
+
+                if (ai.length == 4 && prefix3 != null && prefix3 in 310..369) {
+                    6
+                } else null
+            }
+        }
+    }
+
+    // =====================================================
+    // MAIN PLAIN PARSER
+    // =====================================================
+
+    private fun parsePlain(input: String): List<GS1ParsedResult> {
+
+        val results = mutableListOf<GS1ParsedResult>()
+
+        var index = 0
+        val hasFNC1 = input.contains(FNC1)
+
+        while (index < input.length) {
+
+            // Skip any FNC1
+            while (index < input.length && input[index] == FNC1) {
+                index++
+            }
+
+            if (index >= input.length) break
+
+            val ai = detectAI(input, index) ?: break
+
+            index += ai.length
+
+            val fixedLen = fixedLength(ai)
+
+            val value: String
+
+            if (fixedLen != null) {
+
+                if (index + fixedLen > input.length) break
+
+                value = input.substring(index, index + fixedLen)
+                index += fixedLen
+
+            } else {
+
+                val sb = StringBuilder()
+
+                while (index < input.length) {
+
+                    val ch = input[index]
+
+                    if (hasFNC1 && ch == FNC1) break
+                    if (!hasFNC1 && detectAI(input, index) != null) break
+
+                    sb.append(ch)
+                    index++
+                }
+
+                value = sb.toString()
+            }
+
+            results.add(
+                GS1ParsedResult(
+                    ai = ai,
+                    value = value,
+                    description = autoDescription(ai)
+                )
+            )
+        }
+
+        return results
+    }
+
+    // =====================================================
+    // AUTO DESCRIPTION (OPTIONAL)
+    // =====================================================
+
+    private fun autoDescription(ai: String): String {
+
+        val prefix3 = ai.take(3).toIntOrNull()
+
+        return when {
+
+            ai == "01" -> "GTIN"
+            ai == "02" -> "Contained GTIN"
+            ai == "10" -> "Batch/Lot"
+            ai == "17" -> "Expiration Date"
+            ai == "21" -> "Serial Number"
+            ai == "37" -> "Count"
+
+            ai.length == 4 && prefix3 != null && prefix3 in 310..369 ->
+                "Measurement"
+
+            ai.length == 4 && prefix3 != null && prefix3 in 390..395 ->
+                "Monetary Amount"
+
+            else -> "AI $ai"
+        }
     }
 }

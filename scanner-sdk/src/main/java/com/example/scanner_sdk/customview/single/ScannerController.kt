@@ -16,7 +16,6 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
@@ -62,7 +61,7 @@ class ScannerController(
     private var imageAnalysis: ImageAnalysis? = null
     private var lastValue: String? = null
     private var isFlashEnabled = false
-    private val barCodeList = arrayListOf<String>()
+    private val barCodeList = arrayListOf<Pair<String, String>>()
     private var lensFacing = CameraSelector.LENS_FACING_BACK
     private var currentZoomRatio = 1f
     private var isScanningPaused = false
@@ -314,7 +313,7 @@ class ScannerController(
             val intent = Intent(context, BarcodeListActivity::class.java)
             intent.putStringArrayListExtra(
                 "BARCODE_LIST",
-                ArrayList(barCodeList)
+                ArrayList(barCodeList.map { "${it.first}~~~~~${it.second}" })
             )
 
             context.startActivity(intent)
@@ -350,8 +349,8 @@ class ScannerController(
                                 onBarcodes(barcodes, meta)
                                 Log.d("BarcodeAnalyzer", "tempValue")
                                 barcodes.forEach { codes ->
-                                    if (!barCodeList.contains(codes.rawValue) && !codes.rawValue.isNullOrBlank()) {
-                                        barCodeList.add(codes.rawValue.toString())
+                                    if (!barCodeList.any { it.first == codes.rawValue } && !codes.rawValue.isNullOrBlank()) {
+                                        barCodeList.add(Pair(codes.rawValue.toString(), getBarcodeTypeName(codes.format)))
                                     }
                                 }
                                 if (barCodeList.isNotEmpty()) {
@@ -405,8 +404,8 @@ class ScannerController(
         isScanningPaused = true
 
         val (parsed, barcode, encrypted) = parseBarcodeLikeMultiScan(raw)
-
-        showScanResultBottomSheet(raw = barcode, parsedMap = parsed)
+        val type = getBarcodeTypeName(firstBarcode.format)
+        showScanResultBottomSheet(raw = raw, parsedMap = parsed, type = type)
     }
 
     private fun bindCamera(
@@ -435,8 +434,10 @@ class ScannerController(
         isScanningPaused = true
         imageAnalysis?.clearAnalyzer()
 
-        val result = parseBarcodeLikeMultiScanForAuth(raw)
+        val type = getBarcodeTypeName(barcodes.format)
+        val result = parseBarcodeLikeMultiScanForAuth(raw, type)
 
+        Log.d("BARCODESCANNERLOG", result.toString())
         lifecycleOwner.lifecycleScope.launch {
             authenticateBarcode(
                 barcode = result.barcodeData,
@@ -568,9 +569,10 @@ class ScannerController(
 
     private fun showScanResultBottomSheet(
         raw: String,
+        type: String,
         parsedMap: List<GS1ParsedResult>
     ) {
-        val bottomSheet = ScanResultBottomSheet(rawData = raw, parsedData = parsedMap)
+        val bottomSheet = ScanResultBottomSheet(rawData = raw, parsedData = parsedMap, type = type)
 
         bottomSheet.show(fragmentManager, "ScanResultBottomSheet")
 

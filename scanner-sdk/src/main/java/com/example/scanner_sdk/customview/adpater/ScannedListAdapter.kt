@@ -1,9 +1,11 @@
 package com.example.scanner_sdk.customview.adpater
 
+import android.graphics.Color
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.scanner_sdk.R
@@ -16,12 +18,9 @@ class ScannedListAdapter(
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
         val raw = view.findViewById<TextView>(R.id.txtRawValue)
-        val gtinTitle = view.findViewById<TextView>(R.id.txt_result_title)
-        val gtin = view.findViewById<TextView>(R.id.txtGtin)
-        val batch = view.findViewById<TextView>(R.id.txtBatch)
-        val prod = view.findViewById<TextView>(R.id.txtProduction)
-        val exp = view.findViewById<TextView>(R.id.txtExpiry)
         val status = view.findViewById<TextView>(R.id.txtAuthStatus)
+        val type = view.findViewById<TextView>(R.id.txtBarcodeType)
+        val container = view.findViewById<LinearLayout>(R.id.containerParsedValues)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -36,16 +35,40 @@ class ScannedListAdapter(
 
         val item = list[position]
 
-        Log.d("SCANNERLOGTEMP", "onBindViewHolder: ${item.parsedMap.joinToString()}")
         holder.raw.text = item.raw
-        holder.gtinTitle.text = item.parsedMap.getOrNull(0)?.description ?: ""
-        holder.gtin.text = item.parsedMap.getOrNull(0)?.value ?: ""
-        holder.batch.text = item.parsedMap.getOrNull(1)?.value ?: ""
-        holder.prod.text = item.parsedMap.getOrNull(2)?.value ?: ""
-        holder.exp.text = item.parsedMap.getOrNull(3)?.value ?: ""
+        holder.type.text = item.type
+
+        // ⭐ IMPORTANT — clear old rows (RecyclerView reuse fix)
+        holder.container.removeAllViews()
+
+        val inflater = LayoutInflater.from(holder.itemView.context)
+
+        // ⭐ Add dynamic GS1 rows
+        item.parsedMap.forEach { gs1 ->
+
+            if (gs1.ai == "97" || gs1.ai == "98") return@forEach
+
+            val row = inflater.inflate(
+                R.layout.item_gs1_row,
+                holder.container,
+                false
+            )
+
+            val txtTitle = row.findViewById<TextView>(R.id.gs1TxtTitle)
+            val txtValue = row.findViewById<TextView>(R.id.gs1txtValue)
+
+            txtTitle.text = gs1.description
+            txtTitle.setTextColor(Color.WHITE)
+            txtValue.text = gs1.value
+            txtValue.setTextColor(Color.WHITE)
+
+            holder.container.addView(row)
+        }
 
         holder.status.text =
             if (item.isAuthentic) "Authentic Product"
             else "Fake Product"
+        holder.status.setTextColor(Color.WHITE)
+        holder.status.setBackgroundResource(if (item.isAuthentic) R.drawable.bg_chip_green else R.drawable.bg_chip_red)
     }
 }

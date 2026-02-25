@@ -47,7 +47,11 @@ class BarcodeListActivity : FragmentActivity() {
 
             // Step 1 — Parse
             rawList.forEach {
-                authBarCodeList.add(parseBarcodeLikeMultiScanForAuth(it))
+
+                val barcodeList = it.split("~~~~~")
+                if (barcodeList.size > 1) {
+                    authBarCodeList.add(parseBarcodeLikeMultiScanForAuth(barcodeList[0], barcodeList[1]))
+                }
             }
 
             // Step 2 — Call APIs in parallel
@@ -63,6 +67,7 @@ class BarcodeListActivity : FragmentActivity() {
 
                         ScannedItem(
                             raw = result.barcodeData,
+                            type = result.type,
                             isAuthentic = isSuccess,
                             parsedMap = result.parsedResults
                         )
