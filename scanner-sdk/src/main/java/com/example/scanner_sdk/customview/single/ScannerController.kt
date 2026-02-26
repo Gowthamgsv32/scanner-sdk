@@ -25,6 +25,7 @@ import com.example.scanner_sdk.customview.auth.AuthScannerView
 import com.example.scanner_sdk.customview.dialog.AuthResultDialog
 import com.example.scanner_sdk.customview.dialog.ScanResultBottomSheet
 import com.example.scanner_sdk.customview.getBarcodeTypeName
+import com.example.scanner_sdk.customview.log
 import com.example.scanner_sdk.customview.model.BarcodeAuthMultiRequest
 import com.example.scanner_sdk.customview.model.FrameMetadata
 import com.example.scanner_sdk.customview.model.GS1ParsedResult
@@ -477,9 +478,7 @@ class ScannerController(
         onError: (String) -> Unit,
         onSuccess: (String) -> Unit,
     ) {
-        Log.d("BARCODESCANLOG", "authenticateBarcode: $barcode, \n $encryptedText,\n $companyId")
         val url = "https://dlhub.8aiku.com/scan/auth-bc"
-        Log.d("AUTH_API", url)
 
         try {
             val requestBody = listOf(
@@ -490,7 +489,7 @@ class ScannerController(
                 )
             )
 
-            Log.d("AUTH_API", "requestBody = $requestBody")
+            log(requestBody.toString())
 
             val json = Gson().toJson(requestBody)
 
@@ -509,9 +508,8 @@ class ScannerController(
             }
 
             val responseBody = response.body?.string()
-            Log.d("AUTH_API", "========== AUTH API RESPONSE ==========")
-            Log.d("AUTH_API", responseBody ?: "null")
-            Log.d("AUTH_API", "======================================")
+
+            log("responseBody" + responseBody.toString())
 
             if (responseBody.isNullOrEmpty()) {
                 onError("⚠️ Empty response from server")
@@ -519,6 +517,8 @@ class ScannerController(
             }
 
             val jsonElement = JsonParser.parseString(responseBody)
+
+            log("jsonElement" + jsonElement)
 
             if (jsonElement.isJsonArray) {
                 val array = jsonElement.asJsonArray
@@ -530,7 +530,7 @@ class ScannerController(
                     if (quality.equals("Fake", ignoreCase = true)) {
                         onError("❌ Product Not Authentic")
                     } else {
-                        onSuccess("✅ This Product is 100% Authentic\nYou can trust this product as verified by Sakksh.")
+                        onSuccess("✅ Product is 100% Authentic\nYou can trust this product as verified by Sakksh.")
                     }
                 } else {
                     onError("⚠️ Missing 'quality' field in response")
@@ -543,7 +543,7 @@ class ScannerController(
             }
 
         } catch (e: Exception) {
-            onError("❌ Network error: ${e.localizedMessage}")
+            onError("❌ Product Not Authentic")
         } finally {
             /*Todo*/
         }

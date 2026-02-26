@@ -68,33 +68,27 @@ class AuthResultDialog(
             verifyImg.setImageResource(R.drawable.ic_tick)
             verifyImg.setColorFilter(green)
         }
+        val inflater = layoutInflater
 
-        fun bind(cardId: Int, title: String, value: String) {
-            val card = dialog.findViewById<View>(cardId)
-            card.findViewById<TextView>(R.id.txtTitle).text = title
-            card.findViewById<TextView>(R.id.txtValue).text = value
+        val container = dialog.findViewById<ViewGroup>(R.id.containerParsedCards)
+
+        container.removeAllViews()
+
+        parsedData.forEach { item ->
+
+            if (item.ai == "97" || item.ai == "98") return@forEach
+
+            val card = inflater.inflate(
+                R.layout.item_info_card,
+                container,
+                false
+            )
+
+            card.findViewById<TextView>(R.id.txtTitle).text = item.description
+            card.findViewById<TextView>(R.id.txtValue).text = item.value
+
+            container.addView(card)
         }
-
-        bind(
-            R.id.cardGTIN,
-            parsedData.firstOrNull()?.description ?: "",
-            parsedData.firstOrNull()?.value ?: ""
-        )
-        bind(
-            R.id.cardBatch,
-            parsedData.getOrNull(1)?.description ?: "",
-            parsedData.getOrNull(1)?.value ?: ""
-        )
-        bind(
-            R.id.cardProd,
-            parsedData.getOrNull(2)?.description ?: "",
-            parsedData.getOrNull(2)?.value ?: ""
-        )
-        bind(
-            R.id.cardExp,
-            parsedData.getOrNull(3)?.description ?: "",
-            parsedData.getOrNull(3)?.value ?: ""
-        )
 
         dialog.findViewById<Button>(R.id.btnContinue).setOnClickListener {
             dismiss()

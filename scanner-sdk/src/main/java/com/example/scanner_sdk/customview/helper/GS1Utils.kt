@@ -2,7 +2,7 @@ package com.example.scanner_sdk.customview.helper
 
 import com.example.scanner_sdk.customview.model.AI98SplitResult
 
-object GS1Utils {
+/*object GS1Utils {
 
     private const val FNC1 = '\u001D'
 
@@ -97,9 +97,9 @@ object GS1Utils {
 
     private fun strip(s: String): String =
         s.replace("(", "").replace(")", "")
-}
+}*/
 
-/*object GS1Utils {
+object GS1Utils {
 
     fun splitByAI98(input: String): AI98SplitResult? {
 
@@ -186,4 +186,4 @@ object GS1Utils {
 
     private fun strip(s: String): String =
         s.replace("(", "").replace(")", "")
-}*/
+}
