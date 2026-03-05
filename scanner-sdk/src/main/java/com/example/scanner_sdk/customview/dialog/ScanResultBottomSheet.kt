@@ -1,13 +1,15 @@
 package com.example.scanner_sdk.customview.dialog
 
 import android.content.DialogInterface
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import com.example.scanner_sdk.R
 import com.example.scanner_sdk.customview.model.GS1ParsedResult
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
@@ -15,7 +17,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 class ScanResultBottomSheet(
     private val rawData: String,
     private val type: String,
-    private val parsedData:  List<GS1ParsedResult>
+    private val parsedData: List<GS1ParsedResult>
 ) : BottomSheetDialogFragment() {
     var onDismissCallback: (() -> Unit)? = null
 
@@ -30,7 +32,19 @@ class ScanResultBottomSheet(
             false
         )
 
-        view.findViewById<TextView>(R.id.txtRawData).text = rawData
+        val rawTxtView: TextView = view.findViewById(R.id.txtRawData)
+        rawTxtView.text = rawData
+        if (rawData.startsWith("http", true)) {
+
+            rawTxtView.setTextColor(ContextCompat.getColor(requireContext(), R.color.blue))
+
+            rawTxtView.setOnClickListener {
+
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(rawData))
+                startActivity(intent)
+            }
+        }
+
         view.findViewById<TextView>(R.id.btnType).text = type
 
         val container = view.findViewById<LinearLayout>(R.id.containerParsedValues)

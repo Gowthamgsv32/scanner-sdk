@@ -69,6 +69,7 @@
                 android:paddingVertical="6dp"
                 android:background="@drawable/bg_verified_chip"
                 android:textStyle="bold"
+                android:textSize="12sp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
         </LinearLayout>

@@ -46,10 +46,8 @@ class AuthResultDialog(
         if (isError) {
             titleTxt.visibility = View.GONE
             verifyImg.visibility = View.GONE
-            txtVerifiedStatus.text = "Not Verified"
+            txtVerifiedStatus.text = "Product Not\nAuthentic"
             txtVerifiedStatus.setBackgroundResource(R.drawable.bg_not_verified_chip)
-
-            txtVerifiedStatus.setBackgroundColor(red)
             txtVerifiedStatus.setTextColor(white)
 
             messageTxt.setTextColor(red)
@@ -57,7 +55,7 @@ class AuthResultDialog(
 
         } else {
             titleTxt.text = "Authentication Successful"
-            txtVerifiedStatus.text = "Verified"
+            txtVerifiedStatus.text = "Authentic Product"
 
             txtVerifiedStatus.setBackgroundResource(R.drawable.bg_verified_chip)
             txtVerifiedStatus.setTextColor(white)

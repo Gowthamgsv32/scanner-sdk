@@ -1,19 +1,22 @@
 package com.example.scanner_sdk.customview.adpater
 
+import android.content.Context
+import android.content.Intent
 import android.graphics.Color
-import android.util.Log
+import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.example.scanner_sdk.R
 import com.example.scanner_sdk.customview.model.ScannedItem
-import kotlin.math.log
 
 class ScannedListAdapter(
-    private val list: List<ScannedItem>
+    private val list: List<ScannedItem>,
+    private val context: Context,
 ) : RecyclerView.Adapter<ScannedListAdapter.VH>() {
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
@@ -37,7 +40,16 @@ class ScannedListAdapter(
 
         holder.raw.text = item.raw
         holder.type.text = item.type
+        if (item.raw.startsWith("http", true)) {
 
+            holder.raw.setTextColor(ContextCompat.getColor(context, R.color.blue))
+
+            holder.raw.setOnClickListener {
+
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(item.raw))
+                context.startActivity(intent)
+            }
+        }
         // ⭐ IMPORTANT — clear old rows (RecyclerView reuse fix)
         holder.container.removeAllViews()
 
@@ -58,16 +70,16 @@ class ScannedListAdapter(
             val txtValue = row.findViewById<TextView>(R.id.gs1txtValue)
 
             txtTitle.text = gs1.description
-            txtTitle.setTextColor(Color.WHITE)
+            txtTitle.setTextColor(Color.BLACK)
             txtValue.text = gs1.value
-            txtValue.setTextColor(Color.WHITE)
+            txtValue.setTextColor(Color.BLACK)
 
             holder.container.addView(row)
         }
 
         holder.status.text =
             if (item.isAuthentic) "Authentic Product"
-            else "Fake Product"
+            else "Product Not Authentic"
         holder.status.setTextColor(Color.WHITE)
         holder.status.setBackgroundResource(if (item.isAuthentic) R.drawable.bg_chip_green else R.drawable.bg_chip_red)
     }

@@ -138,7 +138,7 @@ class ScannerController(
             decreaseZoom()
         }
 
-        singleScannerView?.overlayView?.visibility = View.VISIBLE
+        singleScannerView?.overlayView?.visibility = View.GONE
 //        singleScannerView?.txtTitle?.text = "Single Scanner"
 
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
@@ -150,7 +150,8 @@ class ScannerController(
 
                     if(isScanningPaused) return@BarcodeAnalyzer
 
-                    singleScannerView?.overlayView?.setResults(barcodes, meta)
+                    /*Todo: Enable if boundary box needed*/
+//                    singleScannerView?.overlayView?.setResults(barcodes, meta)
                     handleSingleScan(barcodes)
                 },
             )
@@ -260,7 +261,7 @@ class ScannerController(
         authScannerView?.zoomMinus?.setOnClickListener {
             decreaseZoom()
         }
-        authScannerView?.overlayView?.visibility = View.VISIBLE
+        authScannerView?.overlayView?.visibility = View.GONE
 //        authScannerView?.txtTitle?.text = "Authendication Scanner"
 
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
@@ -271,7 +272,8 @@ class ScannerController(
                 onResults = { barcodes, meta ->
                     if(isScanningPaused) return@BarcodeAnalyzer
 
-                    authScannerView?.overlayView?.setResults(barcodes, meta)
+                    /*Todo: Enable if boundary box needed*/
+//                    authScannerView?.overlayView?.setResults(barcodes, meta)
 
                     handleAuthScan(barcodes)
                 },
@@ -528,7 +530,7 @@ class ScannerController(
 
                 if (quality != null) {
                     if (quality.equals("Fake", ignoreCase = true)) {
-                        onError("❌ Product Not Authentic")
+                        onError("❌ Product fake ot not authentic")
                     } else {
                         onSuccess("✅ Product is 100% Authentic\nYou can trust this product as verified by Sakksh.")
                     }
@@ -543,7 +545,7 @@ class ScannerController(
             }
 
         } catch (e: Exception) {
-            onError("❌ Product Not Authentic")
+            onError("❌ Product fake ot not authentic")
         } finally {
             /*Todo*/
         }

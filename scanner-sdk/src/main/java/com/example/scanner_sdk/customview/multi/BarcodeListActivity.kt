@@ -81,7 +81,7 @@ class BarcodeListActivity : FragmentActivity() {
             // Step 3 — Update UI
             progressBar.visibility = View.GONE
 
-            recyclerView.adapter = ScannedListAdapter(finalList)
+            recyclerView.adapter = ScannedListAdapter(list = finalList, context = this@BarcodeListActivity)
         }
     }
 
