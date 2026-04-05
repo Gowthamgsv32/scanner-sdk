@@ -22,6 +22,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.scanner_sdk.customview.BarcodeDataProcessor
 import com.example.scanner_sdk.customview.ConvertToAuthentication
 import com.example.scanner_sdk.customview.auth.AuthScannerView
+import com.example.scanner_sdk.customview.authandsingle.VerificationScannerView
 import com.example.scanner_sdk.customview.dialog.AuthResultDialog
 import com.example.scanner_sdk.customview.dialog.ScanResultBottomSheet
 import com.example.scanner_sdk.customview.getBarcodeTypeName
@@ -51,6 +52,7 @@ class ScannerController(
     private val singleScannerView: SingleScannerView? = null,
     private val multiScannerView: MultiScannerView? = null,
     private val authScannerView: AuthScannerView? = null,
+    private val verificationScannerView: VerificationScannerView? = null,
     private val lifecycleOwner: LifecycleOwner,
     private val fragmentManager: FragmentManager, // 👈 ADD THIS
     private val onScanned: (String) -> Unit
@@ -72,7 +74,6 @@ class ScannerController(
     private val ZOOM_STEP = 0.5f
 
 
-
     fun startSingleScanner(context: Context) {
         start(context)
     }
@@ -81,9 +82,14 @@ class ScannerController(
         startAuth(context)
     }
 
+    fun startVerifyScanner(context: Context) {
+        startVerifyView(context)
+    }
+
     fun startMultiScanner(context: Context) {
         startCamera(context)
     }
+
     private fun start(context: Context) {
 
         camera?.cameraInfo?.zoomState?.value?.let { zoomState ->
@@ -148,7 +154,7 @@ class ScannerController(
             barcodeAnalyzer = BarcodeAnalyzer(
                 onResults = { barcodes, meta ->
 
-                    if(isScanningPaused) return@BarcodeAnalyzer
+                    if (isScanningPaused) return@BarcodeAnalyzer
 
                     /*Todo: Enable if boundary box needed*/
 //                    singleScannerView?.overlayView?.setResults(barcodes, meta)
@@ -179,6 +185,7 @@ class ScannerController(
 
         }, ContextCompat.getMainExecutor(context))
     }
+
     private fun increaseZoom() {
         val newZoom = (currentZoomRatio + ZOOM_STEP).coerceAtMost(maxZoom)
         applyZoom(newZoom)
@@ -194,12 +201,14 @@ class ScannerController(
         camera?.cameraControl?.setZoomRatio(zoom)
         updateZoomUI()
     }
+
     private fun updateZoomUI() {
         val percentage = ((currentZoomRatio / maxZoom) * 100).toInt()
         singleScannerView?.zoomPercentage?.text = "$percentage%"
         updateZoomButtons()
 
     }
+
     private fun updateZoomButtons() {
         singleScannerView?.zoomPlus?.isEnabled = currentZoomRatio < maxZoom
         singleScannerView?.zoomMinus?.isEnabled = currentZoomRatio > minZoom
@@ -211,6 +220,7 @@ class ScannerController(
         updateAuthZoomButtons()
 
     }
+
     private fun updateAuthZoomButtons() {
         authScannerView?.zoomPlus?.isEnabled = currentZoomRatio < maxZoom
         authScannerView?.zoomMinus?.isEnabled = currentZoomRatio > minZoom
@@ -270,7 +280,7 @@ class ScannerController(
 
             barcodeAnalyzer = BarcodeAnalyzer(
                 onResults = { barcodes, meta ->
-                    if(isScanningPaused) return@BarcodeAnalyzer
+                    if (isScanningPaused) return@BarcodeAnalyzer
 
                     /*Todo: Enable if boundary box needed*/
 //                    authScannerView?.overlayView?.setResults(barcodes, meta)
@@ -302,6 +312,98 @@ class ScannerController(
 
         }, ContextCompat.getMainExecutor(context))
     }
+
+    private fun startVerifyView(context: Context) {
+
+        verificationScannerView?.previewView?.visibility = View.VISIBLE
+
+        // For torch mode (continuous flash for preview)
+        verificationScannerView?.flashButton?.setOnClickListener {
+            isFlashEnabled = !isFlashEnabled
+            toggleFlash(isFlashEnabled, verificationScannerView.flashButton)
+            camera?.cameraControl?.enableTorch(isFlashEnabled)
+        }
+        verificationScannerView?.btnGallery?.setOnClickListener {
+            /* todo: openGallery()*/
+        }
+        verificationScannerView?.cameraSwitch?.setOnClickListener {
+            lensFacing =
+                if (lensFacing == CameraSelector.LENS_FACING_BACK)
+                    CameraSelector.LENS_FACING_FRONT
+                else
+                    CameraSelector.LENS_FACING_BACK
+
+            // Reset flash when switching camera
+            isFlashEnabled = false
+            camera?.cameraControl?.enableTorch(false)
+            toggleFlash(false, verificationScannerView.flashButton)
+
+            cameraProvider?.let {
+                val preview = Preview.Builder()
+                    .setTargetResolution(Size(1920, 1080))
+                    .build().also {
+                        it.surfaceProvider = verificationScannerView.previewView.surfaceProvider
+                    }
+
+                imageAnalysis?.let { analysis ->
+                    bindCamera(context, preview, analysis)
+                }
+            }
+        }
+
+        verificationScannerView?.zoomPlus?.setOnClickListener {
+            increaseZoom()
+        }
+
+        verificationScannerView?.zoomMinus?.setOnClickListener {
+            decreaseZoom()
+        }
+        verificationScannerView?.overlayView?.visibility = View.GONE
+//        verificationScannerView?.txtTitle?.text = "Authendication Scanner"
+
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+        cameraProviderFuture.addListener({
+            cameraProvider = cameraProviderFuture.get()
+
+            barcodeAnalyzer = BarcodeAnalyzer(
+                onResults = { barcodes, meta ->
+                    if (isScanningPaused) return@BarcodeAnalyzer
+
+                    /*Todo: Enable if boundary box needed*/
+//                    verificationScannerView?.overlayView?.setResults(barcodes, meta)
+
+                    if (verificationScannerView?.switch?.isChecked == true) {
+                        handleAuthScan(barcodes)
+                    } else {
+                        handleSingleScan(barcodes)
+                    }
+                },
+            )
+
+            val preview = Preview.Builder()
+                .setTargetResolution(Size(1920, 1080))
+                .build()
+            preview.surfaceProvider = verificationScannerView?.previewView?.surfaceProvider
+
+            imageAnalysis = ImageAnalysis.Builder()
+                .setTargetResolution(Size(1920, 1080))
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+
+            barcodeAnalyzer?.let { imageAnalysis?.setAnalyzer(executor, it) }
+
+            cameraProvider?.unbindAll()
+
+            camera = cameraProvider?.bindToLifecycle(
+                lifecycleOwner,
+                CameraSelector.DEFAULT_BACK_CAMERA,
+                preview,
+                imageAnalysis
+            )
+
+        }, ContextCompat.getMainExecutor(context))
+    }
+
     @OptIn(ExperimentalCamera2Interop::class)
     private fun startCamera(context: Context) {
         multiScannerView?.previewView?.visibility = View.VISIBLE
@@ -353,7 +455,12 @@ class ScannerController(
                                 Log.d("BarcodeAnalyzer", "tempValue")
                                 barcodes.forEach { codes ->
                                     if (!barCodeList.any { it.first == codes.rawValue } && !codes.rawValue.isNullOrBlank()) {
-                                        barCodeList.add(Pair(codes.rawValue.toString(), getBarcodeTypeName(codes.format)))
+                                        barCodeList.add(
+                                            Pair(
+                                                codes.rawValue.toString(),
+                                                getBarcodeTypeName(codes.format)
+                                            )
+                                        )
                                     }
                                 }
                                 if (barCodeList.isNotEmpty()) {
@@ -378,9 +485,12 @@ class ScannerController(
                     camInfo.cameraControl.setLinearZoom(0f) // reset zoom
                     camInfo.cameraControl.enableTorch(false) // optional
                     camInfo.cameraControl.startFocusAndMetering(
-                        FocusMeteringAction.Builder(multiScannerView!!.previewView.meteringPointFactory.createPoint(
-                            multiScannerView.previewView.width / 2f, multiScannerView.previewView.height / 2f
-                        )).build()
+                        FocusMeteringAction.Builder(
+                            multiScannerView!!.previewView.meteringPointFactory.createPoint(
+                                multiScannerView.previewView.width / 2f,
+                                multiScannerView.previewView.height / 2f
+                            )
+                        ).build()
                     )
 
                     // Enable continuous focus if device supports it
@@ -398,10 +508,11 @@ class ScannerController(
 
         }, ContextCompat.getMainExecutor(context))
     }
-    private fun handleSingleScan(barcodes: List<Barcode>) {
-        if(barcodes.isEmpty()) return
 
-        val firstBarcode = barcodes.firstOrNull()?: return
+    private fun handleSingleScan(barcodes: List<Barcode>) {
+        if (barcodes.isEmpty()) return
+
+        val firstBarcode = barcodes.firstOrNull() ?: return
         val raw = firstBarcode.rawValue ?: return
 
         isScanningPaused = true
@@ -431,7 +542,7 @@ class ScannerController(
     }
 
     private fun handleAuthScan(barcodes: List<Barcode>) {
-        val barcodes = barcodes.firstOrNull()?: return
+        val barcodes = barcodes.firstOrNull() ?: return
         val raw = barcodes.rawValue ?: return
 
         isScanningPaused = true
@@ -467,6 +578,7 @@ class ScannerController(
 
 //        handleAuthenticationResult(raw, barcodes.format)
     }
+
     fun stop() {
         imageAnalysis?.clearAnalyzer()
         cameraProvider?.unbindAll()
@@ -609,151 +721,184 @@ class ScannerController(
 
     private fun handleAuthenticationResult(result: String, format: Int) {
 //        requireActivity().runOnUiThread {
-            // Immediately freeze scanning when processing starts
+        // Immediately freeze scanning when processing starts
 //            isScanning = false
-            val barcodeType = getBarcodeTypeName(format)
+        val barcodeType = getBarcodeTypeName(format)
 
-            // Step 1: Use ConvertToAuthentication to process the scanned result
-            val authResult = ConvertToAuthentication.convertDynamicPathToGS1(result)
+        // Step 1: Use ConvertToAuthentication to process the scanned result
+        val authResult = ConvertToAuthentication.convertDynamicPathToGS1(result)
 
-            // Step 2: Use BarcodeDataProcessor to extract values and encrypt
-            val processedResult = BarcodeDataProcessor.processConvertedResult(authResult)
+        // Step 2: Use BarcodeDataProcessor to extract values and encrypt
+        val processedResult = BarcodeDataProcessor.processConvertedResult(authResult)
 
-            // Step 3: Send to dlhub.8aiku.com API for authentication
-            try {
-                // Create the request object as expected by the API
-                val requestList = listOf(
-                    BarcodeAuthMultiRequest(
-                        barcodeData = processedResult.barcodeData,
-                        encryptedText = processedResult.encryptedText
-                    )
+        // Step 3: Send to dlhub.8aiku.com API for authentication
+        try {
+            // Create the request object as expected by the API
+            val requestList = listOf(
+                BarcodeAuthMultiRequest(
+                    barcodeData = processedResult.barcodeData,
+                    encryptedText = processedResult.encryptedText
+                )
+            )
+
+            // Log the raw JSON that will be sent
+            val gson = com.google.gson.Gson()
+            val jsonPayload = gson.toJson(requestList)
+
+            // Log cURL equivalent for comparison
+            android.util.Log.d("AuthenticationFragment", "=== CURL EQUIVALENT ===")
+            android.util.Log.d(
+                "AuthenticationFragment",
+                "curl --location 'https://dlhub.8aiku.com/dmai/auth-multbc-ai' \\"
+            )
+            android.util.Log.d(
+                "AuthenticationFragment",
+                "--header 'Content-Type: application/json' \\"
+            )
+            android.util.Log.d("AuthenticationFragment", "--data '$jsonPayload'")
+            android.util.Log.d("AuthenticationFragment", "========================")
+
+            // Log individual request details
+            requestList.forEachIndexed { index, request ->
+                android.util.Log.d("AuthenticationFragment", "Request[$index]:")
+                android.util.Log.d(
+                    "AuthenticationFragment",
+                    "  - barcodeData: '${request.barcodeData}'"
+                )
+                android.util.Log.d(
+                    "AuthenticationFragment",
+                    "  - encryptedText: '${request.encryptedText}'"
+                )
+                android.util.Log.d(
+                    "AuthenticationFragment",
+                    "  - barcodeData length: ${request.barcodeData.length}"
+                )
+                android.util.Log.d(
+                    "AuthenticationFragment",
+                    "  - encryptedText length: ${request.encryptedText.length}"
                 )
 
-                // Log the raw JSON that will be sent
-                val gson = com.google.gson.Gson()
-                val jsonPayload = gson.toJson(requestList)
+                // Compare with expected values from your cURL
+                android.util.Log.d(
+                    "AuthenticationFragment",
+                    "  - Expected barcodeData: 'httpsSakkshcom0195203454189156229767610JAHAH12821HAHAH192811250718'"
+                )
+                android.util.Log.d(
+                    "AuthenticationFragment",
+                    "  - Expected encryptedText: 'vZOyDiK4CHPA='"
+                )
+                android.util.Log.d(
+                    "AuthenticationFragment",
+                    "  - barcodeData matches expected: ${request.barcodeData == "httpsSakkshcom0195203454189156229767610JAHAH12821HAHAH192811250718"}"
+                )
+                android.util.Log.d(
+                    "AuthenticationFragment",
+                    "  - encryptedText matches expected: ${request.encryptedText == "vZOyDiK4CHPA="}"
+                )
+            }
+            android.util.Log.d("AuthenticationFragment", "========================")
 
-                // Log cURL equivalent for comparison
-                android.util.Log.d("AuthenticationFragment", "=== CURL EQUIVALENT ===")
-                android.util.Log.d("AuthenticationFragment", "curl --location 'https://dlhub.8aiku.com/dmai/auth-multbc-ai' \\")
-                android.util.Log.d("AuthenticationFragment", "--header 'Content-Type: application/json' \\")
-                android.util.Log.d("AuthenticationFragment", "--data '$jsonPayload'")
-                android.util.Log.d("AuthenticationFragment", "========================")
-
-                // Log individual request details
-                requestList.forEachIndexed { index, request ->
-                    android.util.Log.d("AuthenticationFragment", "Request[$index]:")
-                    android.util.Log.d("AuthenticationFragment", "  - barcodeData: '${request.barcodeData}'")
-                    android.util.Log.d("AuthenticationFragment", "  - encryptedText: '${request.encryptedText}'")
-                    android.util.Log.d("AuthenticationFragment", "  - barcodeData length: ${request.barcodeData.length}")
-                    android.util.Log.d("AuthenticationFragment", "  - encryptedText length: ${request.encryptedText.length}")
-
-                    // Compare with expected values from your cURL
-                    android.util.Log.d("AuthenticationFragment", "  - Expected barcodeData: 'httpsSakkshcom0195203454189156229767610JAHAH12821HAHAH192811250718'")
-                    android.util.Log.d("AuthenticationFragment", "  - Expected encryptedText: 'vZOyDiK4CHPA='")
-                    android.util.Log.d("AuthenticationFragment", "  - barcodeData matches expected: ${request.barcodeData == "httpsSakkshcom0195203454189156229767610JAHAH12821HAHAH192811250718"}")
-                    android.util.Log.d("AuthenticationFragment", "  - encryptedText matches expected: ${request.encryptedText == "vZOyDiK4CHPA="}")
-                }
-                android.util.Log.d("AuthenticationFragment", "========================")
-
-                // Show loader before API call
+            // Show loader before API call
 //                showLoader()
 
-/*                val apiResult = apiRepository.authenticateBarcodeMulti(requestList)
+            /*                val apiResult = apiRepository.authenticateBarcodeMulti(requestList)
 
-                apiResult.onSuccess { authResponseList ->
-                    android.util.Log.d("AuthenticationFragment", "=== API RESPONSE SUCCESS ===")
-                    android.util.Log.d("AuthenticationFragment", "Response List Size: ${authResponseList.size}")
+                            apiResult.onSuccess { authResponseList ->
+                                android.util.Log.d("AuthenticationFragment", "=== API RESPONSE SUCCESS ===")
+                                android.util.Log.d("AuthenticationFragment", "Response List Size: ${authResponseList.size}")
 
-                    authResponseList.forEachIndexed { index, response ->
-                        android.util.Log.d("AuthenticationFragment", "Response[$index]:")
-                        android.util.Log.d("AuthenticationFragment", "  - barcodeData: '${response.barcodeData}'")
-                        android.util.Log.d("AuthenticationFragment", "  - encryptedText: '${response.encryptedText}'")
-                        android.util.Log.d("AuthenticationFragment", "  - quality: '${response.quality ?: "N/A"}'")
-                        android.util.Log.d("AuthenticationFragment", "  - verified: ${response.verified}")
-                        android.util.Log.d("AuthenticationFragment", "  - message: '${response.message}'")
-                        android.util.Log.d("AuthenticationFragment", "  - error: '${response.error}'")
-                        android.util.Log.d("AuthenticationFragment", "  - authenticationCode: '${response.authenticationCode ?: "N/A"}'")
+                                authResponseList.forEachIndexed { index, response ->
+                                    android.util.Log.d("AuthenticationFragment", "Response[$index]:")
+                                    android.util.Log.d("AuthenticationFragment", "  - barcodeData: '${response.barcodeData}'")
+                                    android.util.Log.d("AuthenticationFragment", "  - encryptedText: '${response.encryptedText}'")
+                                    android.util.Log.d("AuthenticationFragment", "  - quality: '${response.quality ?: "N/A"}'")
+                                    android.util.Log.d("AuthenticationFragment", "  - verified: ${response.verified}")
+                                    android.util.Log.d("AuthenticationFragment", "  - message: '${response.message}'")
+                                    android.util.Log.d("AuthenticationFragment", "  - error: '${response.error}'")
+                                    android.util.Log.d("AuthenticationFragment", "  - authenticationCode: '${response.authenticationCode ?: "N/A"}'")
 
-                        // Log product info if available
-                        response.productInfo?.let { productInfo ->
-                            android.util.Log.d("AuthenticationFragment", "  - productInfo:")
-                            android.util.Log.d("AuthenticationFragment", "    * name: '${productInfo.name}'")
-                            android.util.Log.d("AuthenticationFragment", "    * brand: '${productInfo.brand}'")
-                            android.util.Log.d("AuthenticationFragment", "    * gtin: '${productInfo.gtin ?: "N/A"}'")
-                            android.util.Log.d("AuthenticationFragment", "    * batchNumber: '${productInfo.batchNumber ?: "N/A"}'")
-                            android.util.Log.d("AuthenticationFragment", "    * expiryDate: '${productInfo.expiryDate ?: "N/A"}'")
-                            android.util.Log.d("AuthenticationFragment", "    * serialNumber: '${productInfo.serialNumber ?: "N/A"}'")
-                        } ?: android.util.Log.d("AuthenticationFragment", "  - productInfo: null")
-                    }
-                    android.util.Log.d("AuthenticationFragment", "==============================")
+                                    // Log product info if available
+                                    response.productInfo?.let { productInfo ->
+                                        android.util.Log.d("AuthenticationFragment", "  - productInfo:")
+                                        android.util.Log.d("AuthenticationFragment", "    * name: '${productInfo.name}'")
+                                        android.util.Log.d("AuthenticationFragment", "    * brand: '${productInfo.brand}'")
+                                        android.util.Log.d("AuthenticationFragment", "    * gtin: '${productInfo.gtin ?: "N/A"}'")
+                                        android.util.Log.d("AuthenticationFragment", "    * batchNumber: '${productInfo.batchNumber ?: "N/A"}'")
+                                        android.util.Log.d("AuthenticationFragment", "    * expiryDate: '${productInfo.expiryDate ?: "N/A"}'")
+                                        android.util.Log.d("AuthenticationFragment", "    * serialNumber: '${productInfo.serialNumber ?: "N/A"}'")
+                                    } ?: android.util.Log.d("AuthenticationFragment", "  - productInfo: null")
+                                }
+                                android.util.Log.d("AuthenticationFragment", "==============================")
 
-                    // Process the first response from the list
-                    val authResponse = authResponseList.firstOrNull()
-                    if (authResponse != null) {
-                        android.util.Log.d("AuthenticationFragment", "Processing first response:")
-                        android.util.Log.d("AuthenticationFragment", "  - Quality: ${authResponse.quality}")
-                        android.util.Log.d("AuthenticationFragment", "  - Verified: ${authResponse.verified}")
+                                // Process the first response from the list
+                                val authResponse = authResponseList.firstOrNull()
+                                if (authResponse != null) {
+                                    android.util.Log.d("AuthenticationFragment", "Processing first response:")
+                                    android.util.Log.d("AuthenticationFragment", "  - Quality: ${authResponse.quality}")
+                                    android.util.Log.d("AuthenticationFragment", "  - Verified: ${authResponse.verified}")
 
-                        // Hide loader before showing result
-                        hideLoader()
+                                    // Hide loader before showing result
+                                    hideLoader()
 
-                        // Show authentication result popup (scanning remains frozen until popup is closed)
-                        showAuthenticationResultPopup(authResponse.quality)
+                                    // Show authentication result popup (scanning remains frozen until popup is closed)
+                                    showAuthenticationResultPopup(authResponse.quality)
 
-                    } else {
-                        android.util.Log.w("AuthenticationFragment", "Empty response list from API")
-                        requireActivity().runOnUiThread {
-                            hideLoader()
-                            Toast.makeText(requireContext(),
-                                "⚠️ Empty response from authentication service",
-                                Toast.LENGTH_LONG).show()
-                            // Resume scanning on error
-                            isScanning = true
-                        }
-                    }
-                }.onFailure { error ->
-                    android.util.Log.e("AuthenticationFragment", "=== API RESPONSE FAILED ===")
-                    android.util.Log.e("AuthenticationFragment", "Error Type: ${error.javaClass.simpleName}")
-                    android.util.Log.e("AuthenticationFragment", "Error Message: ${error.message}")
-                    android.util.Log.e("AuthenticationFragment", "Error Cause: ${error.cause?.message}")
-                    android.util.Log.e("AuthenticationFragment", "Stack trace: ${error.stackTraceToString()}")
-                    android.util.Log.e("AuthenticationFragment", "==============================")
+                                } else {
+                                    android.util.Log.w("AuthenticationFragment", "Empty response list from API")
+                                    requireActivity().runOnUiThread {
+                                        hideLoader()
+                                        Toast.makeText(requireContext(),
+                                            "⚠️ Empty response from authentication service",
+                                            Toast.LENGTH_LONG).show()
+                                        // Resume scanning on error
+                                        isScanning = true
+                                    }
+                                }
+                            }.onFailure { error ->
+                                android.util.Log.e("AuthenticationFragment", "=== API RESPONSE FAILED ===")
+                                android.util.Log.e("AuthenticationFragment", "Error Type: ${error.javaClass.simpleName}")
+                                android.util.Log.e("AuthenticationFragment", "Error Message: ${error.message}")
+                                android.util.Log.e("AuthenticationFragment", "Error Cause: ${error.cause?.message}")
+                                android.util.Log.e("AuthenticationFragment", "Stack trace: ${error.stackTraceToString()}")
+                                android.util.Log.e("AuthenticationFragment", "==============================")
 
-                    // Hide loader on error
-                    hideLoader()
+                                // Hide loader on error
+                                hideLoader()
 
-                    requireActivity().runOnUiThread {
-                        Toast.makeText(requireContext(),
-                            "🌐 Network Error:\n${error.message}",
-                            Toast.LENGTH_LONG).show()
-                        // Resume scanning on error
-                        isScanning = true
-                    }
-                }*/
-            } catch (e: Exception) {
-                android.util.Log.e("AuthenticationFragment", "=== AUTHENTICATION EXCEPTION ===")
-                android.util.Log.e("AuthenticationFragment", "Exception Type: ${e.javaClass.simpleName}")
-                android.util.Log.e("AuthenticationFragment", "Exception Message: ${e.message}")
-                android.util.Log.e("AuthenticationFragment", "Exception Cause: ${e.cause?.message}")
-                android.util.Log.e("AuthenticationFragment", "Stack trace: ${e.stackTraceToString()}")
-                android.util.Log.e("AuthenticationFragment", "==================================")
+                                requireActivity().runOnUiThread {
+                                    Toast.makeText(requireContext(),
+                                        "🌐 Network Error:\n${error.message}",
+                                        Toast.LENGTH_LONG).show()
+                                    // Resume scanning on error
+                                    isScanning = true
+                                }
+                            }*/
+        } catch (e: Exception) {
+            android.util.Log.e("AuthenticationFragment", "=== AUTHENTICATION EXCEPTION ===")
+            android.util.Log.e(
+                "AuthenticationFragment",
+                "Exception Type: ${e.javaClass.simpleName}"
+            )
+            android.util.Log.e("AuthenticationFragment", "Exception Message: ${e.message}")
+            android.util.Log.e("AuthenticationFragment", "Exception Cause: ${e.cause?.message}")
+            android.util.Log.e("AuthenticationFragment", "Stack trace: ${e.stackTraceToString()}")
+            android.util.Log.e("AuthenticationFragment", "==================================")
 
-                // Hide loader on exception
-                onScanned("⚠️ Unexpected Error:\n${e.message}")
-/*                hideLoader()
+            // Hide loader on exception
+            onScanned("⚠️ Unexpected Error:\n${e.message}")
+            /*                hideLoader()
 
-                requireActivity().runOnUiThread {
-                    Toast.makeText(requireContext(),
-                        "⚠️ Unexpected Error:\n${e.message}",
-                        Toast.LENGTH_LONG).show()
-                    // Resume scanning on error
-                    isScanning = true
-                }*/
-            }
-
-            // Note: No automatic resume here - scanning will only resume when popup is closed
+                            requireActivity().runOnUiThread {
+                                Toast.makeText(requireContext(),
+                                    "⚠️ Unexpected Error:\n${e.message}",
+                                    Toast.LENGTH_LONG).show()
+                                // Resume scanning on error
+                                isScanning = true
+                            }*/
         }
+
+        // Note: No automatic resume here - scanning will only resume when popup is closed
+    }
 //    }
 
 }

@@ -22,4 +22,9 @@
         <item name="cornerSizeBottomRight">0dp</item>
     </style>
 
+    <style name="BlueSwitch" parent="Theme.AppCompat.Light">
+        <item name="colorControlActivated">#3D8BFF</item>
+        <item name="colorSwitchThumbNormal">#CCCCCC</item>
+        <item name="android:colorForeground">#AAAAAA</item>
+    </style>
 </resources>

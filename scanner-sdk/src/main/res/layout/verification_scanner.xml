@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <!-- Camera preview (full screen) -->
+    <androidx.camera.view.PreviewView
+        android:id="@+id/verificationPreviewView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:implementationMode="performance"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Drawing overlay for boxes and labels -->
+    <com.example.scanner_sdk.customview.single.OverlayView
+        android:id="@+id/verificationOverlayView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:importantForAccessibility="no"
+        app:layout_constraintTop_toTopOf="@id/verificationPreviewView"
+        app:layout_constraintBottom_toBottomOf="@id/verificationPreviewView"
+        app:layout_constraintStart_toStartOf="@id/verificationPreviewView"
+        app:layout_constraintEnd_toEndOf="@id/verificationPreviewView"
+        tools:ignore="MissingClass" />
+
+    <!-- Semi-dark scrim overlay on top of camera -->
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#66000000"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- ───────────── TOP BAR ───────────── -->
+    <!-- Close button (left) -->
+    <ImageButton
+        android:id="@+id/btn_close"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/round_bg_dark"
+        android:src="@drawable/ic_close"
+        android:contentDescription="Close"
+        android:scaleType="centerInside"
+        android:padding="10dp"
+        app:tint="@color/white"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Right-side icon group -->
+    <LinearLayout
+        android:id="@+id/top_header"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="16dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Flash -->
+        <ImageButton
+            android:id="@+id/verification_btn_flash_toggle"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/round_bg_dark"
+            android:src="@drawable/ic_flash_off"
+            android:contentDescription="Flash"
+            android:scaleType="centerInside"
+            android:padding="10dp"
+            app:tint="@color/white" />
+
+        <!-- Gallery -->
+        <ImageButton
+            android:id="@+id/verification_btn_gallery"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/round_bg_dark"
+            android:src="@drawable/ic_gallery"
+            android:contentDescription="Gallery"
+            android:scaleType="centerInside"
+            android:padding="10dp"
+            app:tint="@color/white" />
+
+        <!-- History -->
+        <ImageButton
+            android:id="@+id/btn_history"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/round_bg_dark"
+            android:src="@drawable/ic_history"
+            android:contentDescription="History"
+            android:scaleType="centerInside"
+            android:padding="10dp"
+            app:tint="@color/white" />
+
+        <!-- Settings -->
+        <ImageButton
+            android:id="@+id/btn_settings"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/round_bg_dark"
+            android:src="@drawable/ic_settings"
+            android:contentDescription="Settings"
+            android:scaleType="centerInside"
+            android:padding="10dp"
+            app:tint="@color/white" />
+
+    </LinearLayout>
+
+    <!-- ───────────── SCANNER FRAME (blue rounded rect) ───────────── -->
+    <View
+        android:id="@+id/scanner_frame"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@drawable/scanner_frame_bg"
+        app:layout_constraintWidth_percent="0.82"
+        app:layout_constraintDimensionRatio="1:1.05"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintVertical_bias="0.38" />
+
+    <!-- Horizontal scan line (animated in code) -->
+    <View
+        android:id="@+id/scan_line"
+        android:layout_width="0dp"
+        android:layout_height="2dp"
+        android:background="@drawable/scan_line_gradient"
+        app:layout_constraintStart_toStartOf="@id/scanner_frame"
+        app:layout_constraintEnd_toEndOf="@id/scanner_frame"
+        app:layout_constraintTop_toTopOf="@id/scanner_frame"
+        app:layout_constraintBottom_toBottomOf="@id/scanner_frame"
+        app:layout_constraintVertical_bias="0.5" />
+
+    <!-- Camera-switch button (centered on right edge of frame) -->
+    <ImageButton
+        android:id="@+id/verification_btn_camera_switch"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="@drawable/round_bg_dark"
+        android:src="@drawable/ic_camera_switch"
+        android:contentDescription="Switch Camera"
+        android:scaleType="centerInside"
+        android:padding="10dp"
+        app:tint="@color/white"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="@id/scanner_frame"
+        app:layout_constraintBottom_toBottomOf="@id/scanner_frame"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/scanner_frame"
+        android:layout_marginStart="12dp" />
+
+    <!-- ───────────── HINT TEXT ───────────── -->
+    <TextView
+        android:id="@+id/txt_hint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Align QR code or document within frame"
+        android:textColor="@android:color/white"
+        android:textSize="15sp"
+        android:fontFamily="sans-serif-medium"
+        android:layout_marginTop="24dp"
+        app:layout_constraintTop_toBottomOf="@id/scanner_frame"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- ───────────── VERIFY AUTHENTICITY TOGGLE ROW ───────────── -->
+    <LinearLayout
+        android:id="@+id/verify_row"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingVertical="10dp"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/pill_bg_dark"
+        app:layout_constraintTop_toBottomOf="@id/txt_hint"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Shield icon -->
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_tick"
+            app:tint="#3D8BFF"
+            android:contentDescription="Shield" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Verify Authenticity"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginHorizontal="10dp" />
+
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/switch_verify_verificationenticity"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:theme="@style/BlueSwitch"
+            android:contentDescription="Toggle Verify Authenticity" />
+
+    </LinearLayout>
+
+    <!-- ───────────── BOTTOM SCAN TABS ───────────── -->
+    <LinearLayout
+        android:id="@+id/bottom_tab_bar"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="32dp"
+        android:background="@drawable/bottom_tab_bg"
+        android:clipToPadding="false"
+        android:padding="8dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Single Scan (selected) -->
+        <TextView
+            android:id="@+id/tab_single_scan"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="Single Scan"
+            android:gravity="center"
+            android:textColor="@android:color/white"
+            android:textSize="15sp"
+            android:fontFamily="sans-serif-medium"
+            android:background="@drawable/tab_selected_bg" />
+
+        <!-- Multi Scan -->
+        <TextView
+            android:id="@+id/tab_multi_scan"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="Multi Scan"
+            android:gravity="center"
+            android:textColor="#99FFFFFF"
+            android:textSize="15sp"
+            android:fontFamily="sans-serif-medium"
+            android:background="@android:color/transparent" />
+
+    </LinearLayout>
+
+    <!-- Zoom controls (vertical, right side, vertically centered) -->
+    <LinearLayout
+        android:id="@+id/zoom_controls"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:padding="6dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/round_bg_dark"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintVertical_bias="0.38"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/verification_zoom_plus"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_add"
+            app:tint="@color/white"
+            android:padding="8dp" />
+
+        <TextView
+            android:id="@+id/verification_zoom_percentage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="1.0X"
+            android:textColor="@color/white"
+            android:textSize="11sp"
+            android:layout_marginVertical="4dp" />
+
+        <ImageView
+            android:id="@+id/verification_zoom_minus"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_minus"
+            app:tint="@color/white"
+            android:padding="8dp" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
