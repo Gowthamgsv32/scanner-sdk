@@ -602,6 +602,7 @@ class ScannerController(
                 userId = userId,
                 onError = {
                     error(it)
+                    isScanningPaused = false
 /*                    showAuthScanResult(
                         raw = barcode,
                         parsedMap = result.parsedResults,
@@ -611,6 +612,7 @@ class ScannerController(
                 },
                 onSuccess = {
                     onScanned(it)
+                    isScanningPaused = false
 /*                    showAuthScanResult(
                         raw = barcode,
                         parsedMap = result.parsedResults,
