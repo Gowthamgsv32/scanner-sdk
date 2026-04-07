@@ -37,7 +37,6 @@ import com.example.scanner_sdk.customview.parseBarcodeLikeMultiScanForAuth
 import com.example.scanner_sdk.customview.single.view.SingleScannerView
 import com.example.scanner_sdk.customview.toggleFlash
 import com.google.gson.Gson
-import com.google.gson.JsonParser
 import com.google.mlkit.vision.barcode.common.Barcode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -46,6 +45,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import java.util.concurrent.Executors
 
 class ScannerController(
@@ -55,7 +55,8 @@ class ScannerController(
     private val verificationScannerView: VerificationScannerView? = null,
     private val lifecycleOwner: LifecycleOwner,
     private val fragmentManager: FragmentManager, // 👈 ADD THIS
-    private val onScanned: (String) -> Unit
+    private val error: (String) -> Unit,
+    private val result: (JSONArray?) -> Unit,
 ) {
     private var lastLogTime = System.currentTimeMillis()
     private var camera: Camera? = null
@@ -78,12 +79,12 @@ class ScannerController(
         start(context)
     }
 
-    fun startAuthScanner(context: Context) {
-        startAuth(context)
+    fun startAuthScanner(context: Context, userId: String, companyId: String) {
+        startAuth(context = context, userId = userId, companyId = companyId)
     }
 
-    fun startVerifyScanner(context: Context) {
-        startVerifyView(context)
+    fun startVerifyScanner(context: Context, userId: String, companyId: String) {
+        startVerifyView(context, userId, companyId)
     }
 
     fun startMultiScanner(context: Context) {
@@ -226,7 +227,7 @@ class ScannerController(
         authScannerView?.zoomMinus?.isEnabled = currentZoomRatio > minZoom
     }
 
-    private fun startAuth(context: Context) {
+    private fun startAuth(context: Context, userId: String, companyId: String) {
 
         authScannerView?.previewView?.visibility = View.VISIBLE
 
@@ -285,7 +286,13 @@ class ScannerController(
                     /*Todo: Enable if boundary box needed*/
 //                    authScannerView?.overlayView?.setResults(barcodes, meta)
 
-                    handleAuthScan(barcodes)
+                    handleAuthScan(
+                        barcodes = barcodes,
+                        userId = userId,
+                        companyId = companyId,
+                        onScanned = result,
+                        error = error
+                    )
                 },
             )
 
@@ -313,7 +320,7 @@ class ScannerController(
         }, ContextCompat.getMainExecutor(context))
     }
 
-    private fun startVerifyView(context: Context) {
+    private fun startVerifyView(context: Context, userId: String, companyId: String) {
 
         verificationScannerView?.previewView?.visibility = View.VISIBLE
 
@@ -373,7 +380,13 @@ class ScannerController(
 //                    verificationScannerView?.overlayView?.setResults(barcodes, meta)
 
                     if (verificationScannerView?.switch?.isChecked == true) {
-                        handleAuthScan(barcodes)
+                        handleAuthScan(
+                            barcodes = barcodes,
+                            userId = userId,
+                            companyId = companyId,
+                            onScanned = result,
+                            error = error,
+                        )
                     } else {
                         handleSingleScan(barcodes)
                     }
@@ -466,7 +479,7 @@ class ScannerController(
                                 if (barCodeList.isNotEmpty()) {
 //                                    binding.layoutCount.visibility = android.view.View.VISIBLE
                                 }
-                                multiScannerView?.scanCountTxt?.text = "Count : ${barCodeList.size}"
+                                multiScannerView?.scanCountTxt?.text = "Barcode Count : ${barCodeList.size}"
                             },
                             useFrontCamera = false
                         )
@@ -503,7 +516,7 @@ class ScannerController(
                 }
 
             } catch (e: Exception) {
-                onScanned("Camera binding failed: ${e.message}")
+                error("Camera binding failed: ${e.message}")
             }
 
         }, ContextCompat.getMainExecutor(context))
@@ -541,7 +554,13 @@ class ScannerController(
         )
     }
 
-    private fun handleAuthScan(barcodes: List<Barcode>) {
+    private fun handleAuthScan(
+        barcodes: List<Barcode>,
+        userId: String,
+        companyId: String,
+        onScanned: (JSONArray?) -> Unit,
+        error: (String) -> Unit
+    ) {
         val barcodes = barcodes.firstOrNull() ?: return
         val raw = barcodes.rawValue ?: return
 
@@ -551,27 +570,53 @@ class ScannerController(
         val type = getBarcodeTypeName(barcodes.format)
         val result = parseBarcodeLikeMultiScanForAuth(raw, type)
 
-        Log.d("BARCODESCANNERLOG", result.toString())
+        fun removeCompanyId(text: String): List<String> {
+            return when {
+                text.contains("(98)") -> text.split("(98)")
+                text.contains("(97)") -> text.split("(97)")
+                text.contains("/98)") -> text.split("/98")
+                text.contains("/97") -> text.split("/97")
+                text.contains("/97") -> text.split("/97")
+                text.contains("\u001D98") -> text.split("\u001D98")
+                text.contains("\u001D97") -> text.split("\u001D97")
+//                text.contains("98") -> text.split("98") // Todo handle this type here
+//                text.contains("97") -> text.split("97") // Todo handle this type here
+                else -> listOf(text)
+            }
+        }
+
+        val extractedTxt = removeCompanyId(raw)
+        val barcode = extractedTxt[0]
+        val encryptedText =
+            if (extractedTxt.size > 1) if (extractedTxt[1].length > 18) removeCompanyId(extractedTxt[1])[0] else extractedTxt[1] else ""
+
+        Log.d("BARCODESCANNERLOG", raw)
+        Log.d("BARCODESCANNERLOG", barcode)
+        Log.d("BARCODESCANNERLOG", encryptedText)
+
         lifecycleOwner.lifecycleScope.launch {
             authenticateBarcode(
-                barcode = result.barcodeData,
-                result.encryptedText,
-                companyId = result.companyId,
+                barcode = barcode,
+                encryptedText = encryptedText,
+                companyId = companyId,
+                userId = userId,
                 onError = {
-                    showAuthScanResult(
-                        raw = result.barcodeData,
+                    error(it)
+/*                    showAuthScanResult(
+                        raw = barcode,
                         parsedMap = result.parsedResults,
                         isError = true,
                         message = it
-                    )
+                    )*/
                 },
                 onSuccess = {
-                    showAuthScanResult(
-                        raw = result.barcodeData,
+                    onScanned(it)
+/*                    showAuthScanResult(
+                        raw = barcode,
                         parsedMap = result.parsedResults,
                         message = it,
                         isError = false,
-                    )
+                    )*/
                 }
             )
         }
@@ -589,8 +634,9 @@ class ScannerController(
         barcode: String,
         encryptedText: String,
         companyId: String,
+        userId: String,
         onError: (String) -> Unit,
-        onSuccess: (String) -> Unit,
+        onSuccess: (JSONArray?) -> Unit,
     ) {
         val url = "https://dlhub.8aiku.com/scan/auth-bc"
 
@@ -599,7 +645,8 @@ class ScannerController(
                 mapOf(
                     "barcode_data" to barcode,
                     "encrypted_text" to encryptedText,
-                    "company_id" to companyId
+                    "company_id" to companyId,
+                    "user_id" to userId,
                 )
             )
 
@@ -621,16 +668,17 @@ class ScannerController(
                 client.newCall(request).execute()
             }
 
-            val responseBody = response.body?.string()
+            val responseBody = response.body.string()
 
             log("responseBody" + responseBody.toString())
 
-            if (responseBody.isNullOrEmpty()) {
-                onError("⚠️ Empty response from server")
+            if (responseBody.isEmpty()) {
+                onError(responseBody)
                 return
             }
 
-            val jsonElement = JsonParser.parseString(responseBody)
+            onSuccess(JSONArray(responseBody))
+/*            val jsonElement = JsonParser.parseString(responseBody)
 
             log("jsonElement" + jsonElement)
 
@@ -642,19 +690,20 @@ class ScannerController(
 
                 if (quality != null) {
                     if (quality.equals("Fake", ignoreCase = true)) {
-                        onError("❌ Product fake ot not authentic")
+                        onSuccess(array)
                     } else {
-                        onSuccess("✅ Product is 100% Authentic\nYou can trust this product as verified by Sakksh.")
+                        onSuccess(array)
                     }
                 } else {
-                    onError("⚠️ Missing 'quality' field in response")
+                    onSuccess(array)
                 }
 
             } else if (jsonElement.isJsonPrimitive) {
                 onError(jsonElement.asString)
-            } else {
-                onError("⚠️ Unexpected response format")
             }
+            else {
+                onError("⚠️ Unexpected response format")
+            }*/
 
         } catch (e: Exception) {
             onError("❌ Product fake ot not authentic")
@@ -715,7 +764,7 @@ class ScannerController(
             /*if (seenValues.add(v)) */newCount++
         }
         if (newCount > 0) {
-            onScanned(newCount.toString())
+//            onScanned(newCount.toString())
         }
     }
 
@@ -885,7 +934,7 @@ class ScannerController(
             android.util.Log.e("AuthenticationFragment", "==================================")
 
             // Hide loader on exception
-            onScanned("⚠️ Unexpected Error:\n${e.message}")
+//            onScanned("⚠️ Unexpected Error:\n${e.message}")
             /*                hideLoader()
 
                             requireActivity().runOnUiThread {

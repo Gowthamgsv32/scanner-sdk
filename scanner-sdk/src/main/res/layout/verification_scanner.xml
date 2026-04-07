@@ -42,21 +42,6 @@
         app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- ───────────── TOP BAR ───────────── -->
-    <!-- Close button (left) -->
-    <ImageButton
-        android:id="@+id/btn_close"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp"
-        android:background="@drawable/round_bg_dark"
-        android:src="@drawable/ic_close"
-        android:contentDescription="Close"
-        android:scaleType="centerInside"
-        android:padding="10dp"
-        app:tint="@color/white"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
 
     <!-- Right-side icon group -->
     <LinearLayout
