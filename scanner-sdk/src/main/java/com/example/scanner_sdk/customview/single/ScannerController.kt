@@ -55,9 +55,10 @@ class ScannerController(
     private val verificationScannerView: VerificationScannerView? = null,
     private val lifecycleOwner: LifecycleOwner,
     private val fragmentManager: FragmentManager, // 👈 ADD THIS
-    private val error: (String) -> Unit,
-    private val result: (JSONArray?) -> Unit,
+    private val error: (Pair<String, String>) -> Unit,
+    private val result: (Pair<String, JSONArray?>) -> Unit,
 ) {
+    var shouldResumeScanning: Boolean = true
     private var lastLogTime = System.currentTimeMillis()
     private var camera: Camera? = null
     private var cameraProvider: ProcessCameraProvider? = null
@@ -87,8 +88,8 @@ class ScannerController(
         startVerifyView(context, userId, companyId)
     }
 
-    fun startMultiScanner(context: Context) {
-        startCamera(context)
+    fun startMultiScanner(context: Context, userId: String, companyId: String) {
+        startCamera(context, userId, companyId)
     }
 
     private fun start(context: Context) {
@@ -155,7 +156,7 @@ class ScannerController(
             barcodeAnalyzer = BarcodeAnalyzer(
                 onResults = { barcodes, meta ->
 
-                    if (isScanningPaused) return@BarcodeAnalyzer
+                    if (!shouldResumeScanning) return@BarcodeAnalyzer
 
                     /*Todo: Enable if boundary box needed*/
 //                    singleScannerView?.overlayView?.setResults(barcodes, meta)
@@ -291,7 +292,7 @@ class ScannerController(
                         userId = userId,
                         companyId = companyId,
                         onScanned = result,
-                        error = error
+                        onError = error
                     )
                 },
             )
@@ -374,7 +375,7 @@ class ScannerController(
 
             barcodeAnalyzer = BarcodeAnalyzer(
                 onResults = { barcodes, meta ->
-                    if (isScanningPaused) return@BarcodeAnalyzer
+                    if (!shouldResumeScanning) return@BarcodeAnalyzer
 
                     /*Todo: Enable if boundary box needed*/
 //                    verificationScannerView?.overlayView?.setResults(barcodes, meta)
@@ -385,7 +386,7 @@ class ScannerController(
                             userId = userId,
                             companyId = companyId,
                             onScanned = result,
-                            error = error,
+                            onError = error,
                         )
                     } else {
                         handleSingleScan(barcodes)
@@ -418,7 +419,7 @@ class ScannerController(
     }
 
     @OptIn(ExperimentalCamera2Interop::class)
-    private fun startCamera(context: Context) {
+    private fun startCamera(context: Context, userId: String, companyId: String) {
         multiScannerView?.previewView?.visibility = View.VISIBLE
         multiScannerView?.multiOverlayView?.visibility = View.VISIBLE
 
@@ -433,6 +434,8 @@ class ScannerController(
                 "BARCODE_LIST",
                 ArrayList(barCodeList.map { "${it.first}~~~~~${it.second}" })
             )
+            intent.putExtra("COMPANY_ID", companyId)
+            intent.putExtra("USER_ID", userId)
 
             context.startActivity(intent)
         }
@@ -520,6 +523,15 @@ class ScannerController(
             }
 
         }, ContextCompat.getMainExecutor(context))
+
+
+        multiScannerView?.zoomPlus?.setOnClickListener {
+            increaseZoom()
+        }
+
+        multiScannerView?.zoomMinus?.setOnClickListener {
+            decreaseZoom()
+        }
     }
 
     private fun handleSingleScan(barcodes: List<Barcode>) {
@@ -528,7 +540,7 @@ class ScannerController(
         val firstBarcode = barcodes.firstOrNull() ?: return
         val raw = firstBarcode.rawValue ?: return
 
-        isScanningPaused = true
+        shouldResumeScanning = false
 
         val (parsed, barcode, encrypted) = parseBarcodeLikeMultiScan(raw)
         val type = getBarcodeTypeName(firstBarcode.format)
@@ -558,14 +570,14 @@ class ScannerController(
         barcodes: List<Barcode>,
         userId: String,
         companyId: String,
-        onScanned: (JSONArray?) -> Unit,
-        error: (String) -> Unit
+        onScanned: (Pair<String, JSONArray?>) -> Unit,
+        onError: (Pair<String, String>) -> Unit
     ) {
         val barcodes = barcodes.firstOrNull() ?: return
         val raw = barcodes.rawValue ?: return
 
-        isScanningPaused = true
-        imageAnalysis?.clearAnalyzer()
+        shouldResumeScanning = false
+//        imageAnalysis?.clearAnalyzer()
 
         val type = getBarcodeTypeName(barcodes.format)
         val result = parseBarcodeLikeMultiScanForAuth(raw, type)
@@ -601,8 +613,9 @@ class ScannerController(
                 companyId = companyId,
                 userId = userId,
                 onError = {
-                    error(it)
-                    isScanningPaused = false
+                    val gson = Gson()
+                    val jsonString = gson.toJson(result)
+                    onError(Pair(raw, jsonString))
 /*                    showAuthScanResult(
                         raw = barcode,
                         parsedMap = result.parsedResults,
@@ -611,8 +624,7 @@ class ScannerController(
                     )*/
                 },
                 onSuccess = {
-                    onScanned(it)
-                    isScanningPaused = false
+                    onScanned(Pair(raw, it))
 /*                    showAuthScanResult(
                         raw = barcode,
                         parsedMap = result.parsedResults,
@@ -708,7 +720,7 @@ class ScannerController(
             }*/
 
         } catch (e: Exception) {
-            onError("❌ Product fake ot not authentic")
+            onError("❌ Product fake or not authentic")
         } finally {
             /*Todo*/
         }
@@ -742,7 +754,7 @@ class ScannerController(
         bottomSheet.show(fragmentManager, "ScanResultBottomSheet")
 
         bottomSheet.onDismissCallback = {
-            isScanningPaused = false
+            shouldResumeScanning = true
             barcodeAnalyzer?.let { imageAnalysis?.setAnalyzer(executor, it) }
         }
     }

@@ -13,9 +13,10 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.example.scanner_sdk.R
 import com.example.scanner_sdk.customview.model.ScannedItem
+import com.example.scanner_sdk.customview.multi.ScanResult
 
 class ScannedListAdapter(
-    private val list: List<ScannedItem>,
+    private val list: List<ScanResult>,
     private val context: Context,
 ) : RecyclerView.Adapter<ScannedListAdapter.VH>() {
 
@@ -56,7 +57,7 @@ class ScannedListAdapter(
         val inflater = LayoutInflater.from(holder.itemView.context)
 
         // ⭐ Add dynamic GS1 rows
-        item.parsedMap.forEach { gs1 ->
+        item.gs1Fields.forEach { gs1 ->
 
             if (gs1.ai == "97" || gs1.ai == "98") return@forEach
 
@@ -69,7 +70,7 @@ class ScannedListAdapter(
             val txtTitle = row.findViewById<TextView>(R.id.gs1TxtTitle)
             val txtValue = row.findViewById<TextView>(R.id.gs1txtValue)
 
-            txtTitle.text = gs1.description
+            txtTitle.text = gs1.name
             txtTitle.setTextColor(Color.BLACK)
             txtValue.text = gs1.value
             txtValue.setTextColor(Color.BLACK)
@@ -78,9 +79,9 @@ class ScannedListAdapter(
         }
 
         holder.status.text =
-            if (item.isAuthentic) "Authentic Product"
+            if (item.quality == "Real") "Authentic Product"
             else "Product Not Authentic"
         holder.status.setTextColor(Color.WHITE)
-        holder.status.setBackgroundResource(if (item.isAuthentic) R.drawable.bg_chip_green else R.drawable.bg_chip_red)
+        holder.status.setBackgroundResource(if (item.quality == "Real") R.drawable.bg_chip_green else R.drawable.bg_chip_red)
     }
 }
