@@ -24,6 +24,7 @@ class VerificationScannerView @JvmOverloads constructor(
     val previewView: PreviewView
     val overlayView: OverlayView
     val btnGallery: ImageButton
+    val btnCameraSwitch: ImageButton
     val flashButton: ImageButton
     val cameraSwitch: ImageButton
     val zoomPlus: ImageView
@@ -38,8 +39,9 @@ class VerificationScannerView @JvmOverloads constructor(
         previewView = findViewById(R.id.verificationPreviewView)
         overlayView = findViewById(R.id.verificationOverlayView)
         btnGallery = findViewById(R.id.verification_btn_gallery)
+        btnCameraSwitch = findViewById(R.id.verification_btn_camera_switch)
         flashButton = findViewById(R.id.verification_btn_flash_toggle)
-        cameraSwitch = findViewById(R.id.verification_btn_camera_switch)
+        cameraSwitch = findViewById(R.id.verify_btn_camera_switch)
         zoomPlus = findViewById(R.id.verification_zoom_plus)
         zoomMinus = findViewById(R.id.verification_zoom_minus)
         zoomPercentage = findViewById(R.id.verification_zoom_percentage)

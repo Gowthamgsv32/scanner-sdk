@@ -3,9 +3,12 @@ package com.example.scanner_sdk.customview.single
 import android.content.Context
 import android.content.Intent
 import android.hardware.camera2.CameraCharacteristics
+import android.net.Uri
 import android.util.Log
 import android.util.Size
 import android.view.View
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
@@ -37,7 +40,9 @@ import com.example.scanner_sdk.customview.parseBarcodeLikeMultiScanForAuth
 import com.example.scanner_sdk.customview.single.view.SingleScannerView
 import com.example.scanner_sdk.customview.toggleFlash
 import com.google.gson.Gson
+import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -55,6 +60,7 @@ class ScannerController(
     private val verificationScannerView: VerificationScannerView? = null,
     private val lifecycleOwner: LifecycleOwner,
     private val fragmentManager: FragmentManager, // 👈 ADD THIS
+    private val openGallery: () -> Unit,   // 👈 ADD THIS
     private val error: (Pair<String, String>) -> Unit,
     private val result: (Pair<String, JSONArray?>) -> Unit,
 ) {
@@ -75,7 +81,6 @@ class ScannerController(
     private var maxZoom = 5f
     private val ZOOM_STEP = 0.5f
 
-
     fun startSingleScanner(context: Context) {
         start(context)
     }
@@ -90,6 +95,73 @@ class ScannerController(
 
     fun startMultiScanner(context: Context, userId: String, companyId: String) {
         startCamera(context, userId, companyId)
+    }
+
+    /**
+     * Call this after the user picks an image from the gallery.
+     * Detects barcodes and routes to the correct handler.
+     */
+    fun processGalleryImage(
+        context: Context,
+        uri: Uri,
+        userId: String = "",
+        companyId: String = "",
+    ) {
+        val image = try {
+            InputImage.fromFilePath(context, uri)
+        } catch (e: Exception) {
+            error(Pair("GALLERY_ERROR", "Failed to load image: ${e.message}"))
+            return
+        }
+
+        val scanner = BarcodeScanning.getClient()
+
+        scanner.process(image)
+            .addOnSuccessListener { barcodes ->
+                if (barcodes.isEmpty()) {
+                    error(Pair("GALLERY_ERROR", "No barcode found in the selected image"))
+                    return@addOnSuccessListener
+                }
+
+                // Route to the correct handler based on which view is active
+                when {
+                    authScannerView != null -> {
+                        isScanningPaused = true   // pause live camera while processing
+                        handleAuthScan(
+                            barcodes = barcodes,
+                            userId = userId,
+                            companyId = companyId,
+                            onScanned = result,
+                            onError = error,
+                        )
+                    }
+
+                    verificationScannerView != null -> {
+                        if (verificationScannerView.switch.isChecked) {
+                            handleAuthScan(
+                                barcodes = barcodes,
+                                userId = userId,
+                                companyId = companyId,
+                                onScanned = result,
+                                onError = error,
+                            )
+                        } else {
+                            handleSingleScan(barcodes)
+                        }
+                    }
+
+                    else -> {
+                        // singleScannerView or fallback
+                        handleSingleScan(barcodes)
+                    }
+                }
+            }
+            .addOnFailureListener { e ->
+                error(Pair("GALLERY_ERROR", "Barcode detection failed: ${e.message}"))
+            }
+            .addOnCompleteListener {
+                scanner.close()
+            }
     }
 
     private fun start(context: Context) {
@@ -110,7 +182,7 @@ class ScannerController(
             camera?.cameraControl?.enableTorch(isFlashEnabled)
         }
         singleScannerView?.btnGallery?.setOnClickListener {
-            /* todo: openGallery()*/
+             openGallery()
         }
 
         singleScannerView?.cameraSwitch?.setOnClickListener {
@@ -140,10 +212,12 @@ class ScannerController(
 
         singleScannerView?.zoomPlus?.setOnClickListener {
             increaseZoom()
+            updateZoomUI()
         }
 
         singleScannerView?.zoomMinus?.setOnClickListener {
             decreaseZoom()
+            updateZoomUI()
         }
 
         singleScannerView?.overlayView?.visibility = View.GONE
@@ -201,14 +275,27 @@ class ScannerController(
     private fun applyZoom(zoom: Float) {
         currentZoomRatio = zoom
         camera?.cameraControl?.setZoomRatio(zoom)
-        updateZoomUI()
     }
 
     private fun updateZoomUI() {
-        val percentage = ((currentZoomRatio / maxZoom) * 100).toInt()
-        singleScannerView?.zoomPercentage?.text = "$percentage%"
-        updateZoomButtons()
+        val label = "%.1fx".format(currentZoomRatio)
+        singleScannerView?.zoomPercentage?.text = label
+        singleScannerView?.zoomPlus?.isEnabled = currentZoomRatio < maxZoom
+        singleScannerView?.zoomMinus?.isEnabled = currentZoomRatio > minZoom
+    }
 
+    private fun updateAuthZoomUI() {
+        val label = "%.1fx".format(currentZoomRatio)
+        authScannerView?.zoomPercentage?.text = label
+        authScannerView?.zoomPlus?.isEnabled = currentZoomRatio < maxZoom
+        authScannerView?.zoomMinus?.isEnabled = currentZoomRatio > minZoom
+    }
+
+    private fun updateMultiZoomUI() {
+        val label = "%.1fx".format(currentZoomRatio)
+        multiScannerView?.zoomPercentage?.text = label
+        multiScannerView?.zoomPlus?.isEnabled = currentZoomRatio < maxZoom
+        multiScannerView?.zoomMinus?.isEnabled = currentZoomRatio > minZoom
     }
 
     private fun updateZoomButtons() {
@@ -216,22 +303,20 @@ class ScannerController(
         singleScannerView?.zoomMinus?.isEnabled = currentZoomRatio > minZoom
     }
 
-    private fun updateAuthZoomUI() {
-        val percentage = ((currentZoomRatio / maxZoom) * 100).toInt()
-        authScannerView?.zoomPercentage?.text = "$percentage%"
-        updateAuthZoomButtons()
-
-    }
-
     private fun updateAuthZoomButtons() {
         authScannerView?.zoomPlus?.isEnabled = currentZoomRatio < maxZoom
         authScannerView?.zoomMinus?.isEnabled = currentZoomRatio > minZoom
     }
 
+    private fun updateMultiZoomButtons() {
+        multiScannerView?.zoomPlus?.isEnabled = currentZoomRatio < maxZoom
+        multiScannerView?.zoomMinus?.isEnabled = currentZoomRatio > minZoom
+    }
+
     private fun startAuth(context: Context, userId: String, companyId: String) {
 
         authScannerView?.previewView?.visibility = View.VISIBLE
-
+        updateAuthZoomUI()
         // For torch mode (continuous flash for preview)
         authScannerView?.flashButton?.setOnClickListener {
             isFlashEnabled = !isFlashEnabled
@@ -239,7 +324,7 @@ class ScannerController(
             camera?.cameraControl?.enableTorch(isFlashEnabled)
         }
         authScannerView?.btnGallery?.setOnClickListener {
-            /* todo: openGallery()*/
+            openGallery()
         }
         authScannerView?.cameraSwitch?.setOnClickListener {
             lensFacing =
@@ -268,10 +353,12 @@ class ScannerController(
 
         authScannerView?.zoomPlus?.setOnClickListener {
             increaseZoom()
+            updateAuthZoomUI()
         }
 
         authScannerView?.zoomMinus?.setOnClickListener {
             decreaseZoom()
+            updateAuthZoomUI()
         }
         authScannerView?.overlayView?.visibility = View.GONE
 //        authScannerView?.txtTitle?.text = "Authendication Scanner"
@@ -332,7 +419,7 @@ class ScannerController(
             camera?.cameraControl?.enableTorch(isFlashEnabled)
         }
         verificationScannerView?.btnGallery?.setOnClickListener {
-            /* todo: openGallery()*/
+            openGallery()
         }
         verificationScannerView?.cameraSwitch?.setOnClickListener {
             lensFacing =
@@ -524,13 +611,50 @@ class ScannerController(
 
         }, ContextCompat.getMainExecutor(context))
 
+        updateMultiZoomUI()
 
         multiScannerView?.zoomPlus?.setOnClickListener {
             increaseZoom()
+            updateMultiZoomUI()
         }
 
         multiScannerView?.zoomMinus?.setOnClickListener {
             decreaseZoom()
+            updateMultiZoomUI()
+        }
+
+        multiScannerView?.flashButton?.setOnClickListener {
+            isFlashEnabled = !isFlashEnabled
+            toggleFlash(isFlashEnabled, multiScannerView.flashButton)
+            camera?.cameraControl?.enableTorch(isFlashEnabled)
+        }
+        multiScannerView?.btnGallery?.setOnClickListener {
+            openGallery()
+        }
+
+        multiScannerView?.cameraSwitch?.setOnClickListener {
+            lensFacing =
+                if (lensFacing == CameraSelector.LENS_FACING_BACK)
+                    CameraSelector.LENS_FACING_FRONT
+                else
+                    CameraSelector.LENS_FACING_BACK
+
+            // Reset flash when switching camera
+            isFlashEnabled = false
+            camera?.cameraControl?.enableTorch(false)
+            toggleFlash(false, multiScannerView.flashButton)
+
+            cameraProvider?.let {
+                val preview = Preview.Builder()
+                    .setTargetResolution(Size(1920, 1080))
+                    .build().also {
+                        it.surfaceProvider = multiScannerView.previewView.surfaceProvider
+                    }
+
+                imageAnalysis?.let { analysis ->
+                    bindCamera(context, preview, analysis)
+                }
+            }
         }
     }
 
