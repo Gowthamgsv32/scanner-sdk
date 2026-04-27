@@ -9,7 +9,6 @@ import android.view.animation.LinearInterpolator
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.appcompat.widget.SwitchCompat
 import androidx.camera.view.PreviewView
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.example.scanner_sdk.R
@@ -27,10 +26,11 @@ class VerificationScannerView @JvmOverloads constructor(
     val btnCameraSwitch: ImageButton
     val flashButton: ImageButton
     val cameraSwitch: ImageButton
+    val more: ImageButton
+    val scanCountTxt: TextView
     val zoomPlus: ImageView
     val zoomMinus: ImageView
     val zoomPercentage: TextView
-    val switch: SwitchCompat
 
     init {
         LayoutInflater.from(context).inflate(R.layout.verification_scanner, this, true)
@@ -42,10 +42,11 @@ class VerificationScannerView @JvmOverloads constructor(
         btnCameraSwitch = findViewById(R.id.verification_btn_camera_switch)
         flashButton = findViewById(R.id.verification_btn_flash_toggle)
         cameraSwitch = findViewById(R.id.verify_btn_camera_switch)
+        more = findViewById(R.id.verify_btn_more)
+        scanCountTxt = findViewById(R.id.txt_verify_scan_count)
         zoomPlus = findViewById(R.id.verification_zoom_plus)
         zoomMinus = findViewById(R.id.verification_zoom_minus)
         zoomPercentage = findViewById(R.id.verification_zoom_percentage)
-        switch = findViewById(R.id.switch_verify_verificationenticity)
 
         startScanLineAnimation()
     }

@@ -93,6 +93,18 @@
             android:padding="10dp"
             app:tint="@color/white" />
 
+        <ImageButton
+            android:id="@+id/verify_btn_more"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/round_bg_dark"
+            android:src="@drawable/ic_more"
+            android:contentDescription="More"
+            android:scaleType="centerInside"
+            android:padding="10dp"
+            app:tint="@color/white" />
+
     </LinearLayout>
 
     <!-- ───────────── SCANNER FRAME (blue rounded rect) ───────────── -->
@@ -138,62 +150,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@id/scanner_frame"
         android:layout_marginStart="12dp" />
-
-    <!-- ───────────── HINT TEXT ───────────── -->
-    <TextView
-        android:id="@+id/txt_hint"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Align QR code or document within frame"
-        android:textColor="@android:color/white"
-        android:textSize="15sp"
-        android:fontFamily="sans-serif-medium"
-        android:layout_marginTop="24dp"
-        app:layout_constraintTop_toBottomOf="@id/scanner_frame"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- ───────────── VERIFY AUTHENTICITY TOGGLE ROW ───────────── -->
-    <LinearLayout
-        android:id="@+id/verify_row"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingHorizontal="20dp"
-        android:paddingVertical="10dp"
-        android:layout_marginTop="16dp"
-        android:background="@drawable/pill_bg_dark"
-        app:layout_constraintTop_toBottomOf="@id/txt_hint"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <!-- Shield icon -->
-        <ImageView
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:src="@drawable/ic_tick"
-            app:tint="#3D8BFF"
-            android:contentDescription="Shield" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Verify Authenticity"
-            android:textColor="@android:color/white"
-            android:textSize="14sp"
-            android:fontFamily="sans-serif-medium"
-            android:layout_marginHorizontal="10dp" />
-
-        <androidx.appcompat.widget.SwitchCompat
-            android:id="@+id/switch_verify_verificationenticity"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:checked="true"
-            android:theme="@style/BlueSwitch"
-            android:contentDescription="Toggle Verify Authenticity" />
-
-    </LinearLayout>
 
     <!-- ───────────── BOTTOM SCAN TABS ───────────── -->
     <LinearLayout
@@ -281,5 +237,22 @@
             android:padding="8dp" />
 
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/txt_verify_scan_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Scanned Count"
+        android:textColor="@color/white"
+        android:textSize="16sp"
+        android:visibility="gone"
+        android:paddingVertical="12dp"
+        android:paddingHorizontal="16dp"
+        android:background="@drawable/rounded_bg"
+        android:layout_marginBottom="120dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

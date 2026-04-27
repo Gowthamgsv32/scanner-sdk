@@ -15,4 +15,6 @@
     <color name="dark_green">#FF276221</color>
     <color name="light_green">#FF5bb450</color>
     <color name="red">#FF0000</color>
+
+    <color name="blue_accent">#3D8BFF</color>
 </resources>

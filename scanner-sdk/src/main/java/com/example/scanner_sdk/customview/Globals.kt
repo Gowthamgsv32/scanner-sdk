@@ -15,7 +15,7 @@ fun log(message: Any) {
     Log.d(LOG, message.toString())
 }
 
-enum class ScanMode { SINGLE, MULTIPLE }
+enum class ScanMode { SINGLE, MULTI, Auth }
 
 fun toggleFlash(isFlashEnabled: Boolean, view: ImageView) {
     val flashMode = if (isFlashEnabled) {

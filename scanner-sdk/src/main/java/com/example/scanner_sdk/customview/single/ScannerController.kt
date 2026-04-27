@@ -7,8 +7,6 @@ import android.net.Uri
 import android.util.Log
 import android.util.Size
 import android.view.View
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
@@ -24,10 +22,12 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.example.scanner_sdk.customview.BarcodeDataProcessor
 import com.example.scanner_sdk.customview.ConvertToAuthentication
+import com.example.scanner_sdk.customview.ScanMode
 import com.example.scanner_sdk.customview.auth.AuthScannerView
 import com.example.scanner_sdk.customview.authandsingle.VerificationScannerView
 import com.example.scanner_sdk.customview.dialog.AuthResultDialog
 import com.example.scanner_sdk.customview.dialog.ScanResultBottomSheet
+import com.example.scanner_sdk.customview.dialog.VerificationSettingsBottomSheet
 import com.example.scanner_sdk.customview.getBarcodeTypeName
 import com.example.scanner_sdk.customview.log
 import com.example.scanner_sdk.customview.model.BarcodeAuthMultiRequest
@@ -80,6 +80,8 @@ class ScannerController(
     private var minZoom = 1f
     private var maxZoom = 5f
     private val ZOOM_STEP = 0.5f
+    var currentScanMode = ScanMode.SINGLE
+    var isVerifyEnabled = false
 
     fun startSingleScanner(context: Context) {
         start(context)
@@ -104,8 +106,8 @@ class ScannerController(
     fun processGalleryImage(
         context: Context,
         uri: Uri,
-        userId: String = "",
-        companyId: String = "",
+        userId: String = "0",
+        companyId: String = "0",
     ) {
         val image = try {
             InputImage.fromFilePath(context, uri)
@@ -137,7 +139,7 @@ class ScannerController(
                     }
 
                     verificationScannerView != null -> {
-                        if (verificationScannerView.switch.isChecked) {
+                        if (isVerifyEnabled) {
                             handleAuthScan(
                                 barcodes = barcodes,
                                 userId = userId,
@@ -182,7 +184,7 @@ class ScannerController(
             camera?.cameraControl?.enableTorch(isFlashEnabled)
         }
         singleScannerView?.btnGallery?.setOnClickListener {
-             openGallery()
+            openGallery()
         }
 
         singleScannerView?.cameraSwitch?.setOnClickListener {
@@ -409,8 +411,26 @@ class ScannerController(
     }
 
     private fun startVerifyView(context: Context, userId: String, companyId: String) {
-
         verificationScannerView?.previewView?.visibility = View.VISIBLE
+
+        verificationScannerView?.more?.setOnClickListener {
+            val sheet = VerificationSettingsBottomSheet.newInstance(
+                scanMode = currentScanMode,
+                isVerifyEnabled = isVerifyEnabled,
+            )
+            sheet.onScanModeChanged = { mode ->
+                currentScanMode = mode
+                verificationScannerView.scanCountTxt.visibility =
+                    if (mode == ScanMode.MULTI) View.VISIBLE else View.GONE
+            }
+            sheet.onVerifyAuthenticityChanged = { enabled ->
+                isVerifyEnabled = enabled
+            }
+            sheet.onDismissCallback = {
+                // resume scanning etc.
+            }
+            sheet.show(fragmentManager, "VerificationSettings")
+        }
 
         // For torch mode (continuous flash for preview)
         verificationScannerView?.flashButton?.setOnClickListener {
@@ -453,7 +473,26 @@ class ScannerController(
         verificationScannerView?.zoomMinus?.setOnClickListener {
             decreaseZoom()
         }
+
         verificationScannerView?.overlayView?.visibility = View.GONE
+
+        verificationScannerView?.scanCountTxt?.setOnClickListener {
+
+            if (barCodeList.isEmpty()) return@setOnClickListener
+
+            val context = verificationScannerView.context
+
+            val intent = Intent(context, BarcodeListActivity::class.java)
+            intent.putStringArrayListExtra(
+                "BARCODE_LIST",
+                ArrayList(barCodeList.map { "${it.first}~~~~~${it.second}" })
+            )
+            intent.putExtra("COMPANY_ID", companyId)
+            intent.putExtra("USER_ID", userId)
+
+            context.startActivity(intent)
+        }
+
 //        verificationScannerView?.txtTitle?.text = "Authendication Scanner"
 
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
@@ -467,16 +506,36 @@ class ScannerController(
                     /*Todo: Enable if boundary box needed*/
 //                    verificationScannerView?.overlayView?.setResults(barcodes, meta)
 
-                    if (verificationScannerView?.switch?.isChecked == true) {
-                        handleAuthScan(
-                            barcodes = barcodes,
-                            userId = userId,
-                            companyId = companyId,
-                            onScanned = result,
-                            onError = error,
-                        )
+                    if (currentScanMode == ScanMode.MULTI) {
+                        onBarcodes(barcodes, meta)
+                        Log.d("BarcodeAnalyzer", "tempValue")
+                        barcodes.forEach { codes ->
+                            if (!barCodeList.any { it.first == codes.rawValue } && !codes.rawValue.isNullOrBlank()) {
+                                barCodeList.add(
+                                    Pair(
+                                        codes.rawValue.toString(),
+                                        getBarcodeTypeName(codes.format)
+                                    )
+                                )
+                            }
+                        }
+                        if (barCodeList.isNotEmpty()) {
+//                                    binding.layoutCount.visibility = android.view.View.VISIBLE
+                        }
+                        verificationScannerView?.scanCountTxt?.text =
+                            "Barcode Count : ${barCodeList.size}"
                     } else {
-                        handleSingleScan(barcodes)
+                        if (isVerifyEnabled) {
+                            handleAuthScan(
+                                barcodes = barcodes,
+                                userId = userId,
+                                companyId = companyId,
+                                onScanned = result,
+                                onError = error,
+                            )
+                        } else {
+                            handleSingleScan(barcodes)
+                        }
                     }
                 },
             )
@@ -569,7 +628,8 @@ class ScannerController(
                                 if (barCodeList.isNotEmpty()) {
 //                                    binding.layoutCount.visibility = android.view.View.VISIBLE
                                 }
-                                multiScannerView?.scanCountTxt?.text = "Barcode Count : ${barCodeList.size}"
+                                multiScannerView?.scanCountTxt?.text =
+                                    "Barcode Count : ${barCodeList.size}"
                             },
                             useFrontCamera = false
                         )
@@ -740,21 +800,21 @@ class ScannerController(
                     val gson = Gson()
                     val jsonString = gson.toJson(result)
                     onError(Pair(raw, jsonString))
-/*                    showAuthScanResult(
-                        raw = barcode,
-                        parsedMap = result.parsedResults,
-                        isError = true,
-                        message = it
-                    )*/
+                    /*                    showAuthScanResult(
+                                            raw = barcode,
+                                            parsedMap = result.parsedResults,
+                                            isError = true,
+                                            message = it
+                                        )*/
                 },
                 onSuccess = {
                     onScanned(Pair(raw, it))
-/*                    showAuthScanResult(
-                        raw = barcode,
-                        parsedMap = result.parsedResults,
-                        message = it,
-                        isError = false,
-                    )*/
+                    /*                    showAuthScanResult(
+                                            raw = barcode,
+                                            parsedMap = result.parsedResults,
+                                            message = it,
+                                            isError = false,
+                                        )*/
                 }
             )
         }
@@ -816,32 +876,32 @@ class ScannerController(
             }
 
             onSuccess(JSONArray(responseBody))
-/*            val jsonElement = JsonParser.parseString(responseBody)
+            /*            val jsonElement = JsonParser.parseString(responseBody)
 
-            log("jsonElement" + jsonElement)
+                        log("jsonElement" + jsonElement)
 
-            if (jsonElement.isJsonArray) {
-                val array = jsonElement.asJsonArray
-                val first = array.firstOrNull()?.asJsonObject
+                        if (jsonElement.isJsonArray) {
+                            val array = jsonElement.asJsonArray
+                            val first = array.firstOrNull()?.asJsonObject
 
-                val quality = first?.get("quality")?.asString
+                            val quality = first?.get("quality")?.asString
 
-                if (quality != null) {
-                    if (quality.equals("Fake", ignoreCase = true)) {
-                        onSuccess(array)
-                    } else {
-                        onSuccess(array)
-                    }
-                } else {
-                    onSuccess(array)
-                }
+                            if (quality != null) {
+                                if (quality.equals("Fake", ignoreCase = true)) {
+                                    onSuccess(array)
+                                } else {
+                                    onSuccess(array)
+                                }
+                            } else {
+                                onSuccess(array)
+                            }
 
-            } else if (jsonElement.isJsonPrimitive) {
-                onError(jsonElement.asString)
-            }
-            else {
-                onError("⚠️ Unexpected response format")
-            }*/
+                        } else if (jsonElement.isJsonPrimitive) {
+                            onError(jsonElement.asString)
+                        }
+                        else {
+                            onError("⚠️ Unexpected response format")
+                        }*/
 
         } catch (e: Exception) {
             onError("❌ Product fake or not authentic")
