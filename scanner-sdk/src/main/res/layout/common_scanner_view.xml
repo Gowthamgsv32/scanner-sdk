@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <com.example.scanner_sdk.customview.single.view.SingleScannerView
+        android:id="@+id/singleScannerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        />
+
+    <com.example.scanner_sdk.customview.auth.AuthScannerView
+        android:id="@+id/authScannerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        />
+
+    <com.example.scanner_sdk.customview.authandsingle.VerificationScannerView
+        android:id="@+id/verifyScannerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        />
+
+    <com.example.scanner_sdk.customview.multi.view.MultiScannerView
+        android:id="@+id/multiScannerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        />
+
+    <!-- Right-side icon group -->
+    <LinearLayout
+        android:id="@+id/common_view_top_header"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="16dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Flash -->
+        <ImageButton
+            android:id="@+id/common_view_btn_flash_toggle"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/round_bg_dark"
+            android:src="@drawable/ic_flash_off"
+            android:contentDescription="Flash"
+            android:scaleType="centerInside"
+            android:padding="10dp"
+            app:tint="@color/white" />
+
+        <!-- Gallery -->
+        <ImageButton
+            android:id="@+id/common_view_btn_gallery"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/round_bg_dark"
+            android:src="@drawable/ic_gallery"
+            android:contentDescription="Gallery"
+            android:scaleType="centerInside"
+            android:padding="10dp"
+            app:tint="@color/white" />
+
+        <!-- camera toggle -->
+        <ImageButton
+            android:id="@+id/common_view_btn_camera_switch"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/round_bg_dark"
+            android:src="@drawable/ic_camera_switch"
+            android:contentDescription="Settings"
+            android:scaleType="centerInside"
+            android:padding="10dp"
+            app:tint="@color/white" />
+
+        <ImageButton
+            android:id="@+id/common_view_btn_more"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/round_bg_dark"
+            android:src="@drawable/ic_more"
+            android:contentDescription="More"
+            android:scaleType="centerInside"
+            android:padding="10dp"
+            app:tint="@color/white" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

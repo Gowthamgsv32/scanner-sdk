@@ -92,7 +92,7 @@ class MultiOverlayView @JvmOverloads constructor(
             canvas.drawRect(rectF, boxPaint)
 
             // draw the code text
-            val value = bc.rawValue ?: "No Value"
+/*            val value = bc.rawValue ?: "No Value"
             val tempValue = value.ifEmpty { "No Value" }
             Log.d("BarcodeAnalyzer", tempValue)
             if (value.isNotEmpty()) {
@@ -102,7 +102,7 @@ class MultiOverlayView @JvmOverloads constructor(
                     rectF.top - 8f,
                     textPaint
                 )
-            }
+            }*/
         }
     }
 }

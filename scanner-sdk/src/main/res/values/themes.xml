@@ -27,4 +27,13 @@
         <item name="colorSwitchThumbNormal">#CCCCCC</item>
         <item name="android:colorForeground">#AAAAAA</item>
     </style>
+
+    <!-- res/values/themes.xml -->
+    <style name="TransparentBottomSheet" parent="Theme.Design.Light.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/TransparentBottomSheetStyle</item>
+    </style>
+
+    <style name="TransparentBottomSheetStyle" parent="Widget.Design.BottomSheet.Modal">
+        <item name="android:background">@android:color/transparent</item>
+    </style>
 </resources>

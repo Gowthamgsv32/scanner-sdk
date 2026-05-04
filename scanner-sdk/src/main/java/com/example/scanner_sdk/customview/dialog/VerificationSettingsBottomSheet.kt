@@ -1,5 +1,176 @@
 package com.example.scanner_sdk.customview.dialog
 
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.ImageButton
+import android.widget.LinearLayout
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.appcompat.widget.SwitchCompat
+import com.example.scanner_sdk.R
+import com.example.scanner_sdk.customview.ScanMode
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+
+class VerificationSettingsBottomSheet : BottomSheetDialogFragment() {
+
+    companion object {
+        private const val ARG_SCAN_MODE  = "scan_mode"
+        private const val ARG_VERIFY     = "is_verify_enabled"
+
+        fun newInstance(
+            scanMode: ScanMode,
+            isVerifyEnabled: Boolean,
+        ) = VerificationSettingsBottomSheet().apply {
+            arguments = Bundle().apply {
+                putString(ARG_SCAN_MODE, scanMode.name)
+                putBoolean(ARG_VERIFY, isVerifyEnabled)
+            }
+        }
+    }
+
+    // ── Callbacks ────────────────────────────────────────────────────────────────
+    /** Called immediately when the user taps a mode card (sheet stays open). */
+    var onScanModeChanged: ((ScanMode) -> Unit)? = null
+
+    /** Called when the verify-authenticity switch is toggled. */
+    var onVerifyAuthenticityChanged: ((Boolean) -> Unit)? = null
+
+    /** Called when the sheet is fully dismissed. */
+    var onDismissCallback: (() -> Unit)? = null
+
+    // ── State ────────────────────────────────────────────────────────────────────
+    private var currentMode: ScanMode = ScanMode.SINGLE
+    private var isVerifyEnabled: Boolean = true
+
+    // ── Views ────────────────────────────────────────────────────────────────────
+    private lateinit var cardSingle: LinearLayout
+    private lateinit var cardMulti: LinearLayout
+    private lateinit var checkSingle: ImageView
+    private lateinit var titleSingle: TextView
+    private lateinit var titleMulti: TextView
+    private lateinit var switchVerify: SwitchCompat
+    private lateinit var txtVerifyStatus: TextView
+    private lateinit var authStatusDot: View
+    private lateinit var txtAuthStatus: TextView
+    private lateinit var btnClose: ImageButton
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────────
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        currentMode     = ScanMode.valueOf(arguments?.getString(ARG_SCAN_MODE) ?: ScanMode.SINGLE.name)
+        isVerifyEnabled = arguments?.getBoolean(ARG_VERIFY, true) ?: true
+    }
+    override fun getTheme(): Int = R.style.TransparentBottomSheet
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+    ): View = inflater.inflate(R.layout.bottom_sheet_verification_settings, container, false)
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        // Expand sheet fully on open
+        (dialog as? BottomSheetDialog)?.behavior?.apply {
+            state     = BottomSheetBehavior.STATE_EXPANDED
+            skipCollapsed = true
+        }
+
+        bindViews(view)
+        renderMode(currentMode)
+        renderVerify(isVerifyEnabled)
+        setupListeners()
+    }
+
+    override fun onDismiss(dialog: android.content.DialogInterface) {
+        super.onDismiss(dialog)
+        onDismissCallback?.invoke()
+    }
+
+    // ── Bind ─────────────────────────────────────────────────────────────────────
+    private fun bindViews(v: View) {
+        cardSingle      = v.findViewById(R.id.card_single_scan)
+        cardMulti       = v.findViewById(R.id.card_multi_scan)
+        checkSingle     = v.findViewById(R.id.ic_single_scan_check)
+        titleSingle     = v.findViewById(R.id.txt_single_scan_title)
+        titleMulti      = v.findViewById(R.id.txt_multi_scan_title)
+        switchVerify    = v.findViewById(R.id.switch_verify_verificationenticity)
+        txtVerifyStatus = v.findViewById(R.id.txt_verify_status)
+        authStatusDot   = v.findViewById(R.id.auth_status_dot)
+        txtAuthStatus   = v.findViewById(R.id.txt_auth_status)
+        btnClose        = v.findViewById(R.id.btn_close_bottom_sheet)
+    }
+
+    private fun setupListeners() {
+        cardSingle.setOnClickListener {
+            if (currentMode != ScanMode.SINGLE) {
+                currentMode = ScanMode.SINGLE
+                renderMode(ScanMode.SINGLE)
+                onScanModeChanged?.invoke(ScanMode.SINGLE)
+            }
+        }
+
+        cardMulti.setOnClickListener {
+            if (currentMode != ScanMode.MULTI) {
+                currentMode = ScanMode.MULTI
+                renderMode(ScanMode.MULTI)
+                onScanModeChanged?.invoke(ScanMode.MULTI)
+            }
+        }
+
+        switchVerify.setOnCheckedChangeListener { _, checked ->
+            isVerifyEnabled = checked
+            renderVerify(checked)
+            onVerifyAuthenticityChanged?.invoke(checked)
+        }
+
+        btnClose.setOnClickListener { dismiss() }
+    }
+
+    // ── Render helpers ───────────────────────────────────────────────────────────
+    private fun renderMode(mode: ScanMode) {
+        val blue  = requireContext().getColor(R.color.blue_accent)
+        val white = requireContext().getColor(android.R.color.white)
+
+        when (mode) {
+            ScanMode.SINGLE -> {
+                cardSingle.setBackgroundResource(R.drawable.scan_mode_selected_bg)
+                cardMulti.setBackgroundResource(R.drawable.scan_mode_unselected_bg)
+                checkSingle.visibility = View.VISIBLE
+                titleSingle.setTextColor(blue)
+                titleMulti.setTextColor(white)
+            }
+            ScanMode.MULTI -> {
+                cardSingle.setBackgroundResource(R.drawable.scan_mode_unselected_bg)
+                cardMulti.setBackgroundResource(R.drawable.scan_mode_selected_bg)
+                checkSingle.visibility = View.GONE
+                titleSingle.setTextColor(white)
+                titleMulti.setTextColor(blue)
+            }
+            else -> {}
+        }
+    }
+
+    private fun renderVerify(enabled: Boolean) {
+        switchVerify.isChecked = enabled
+        if (enabled) {
+            txtVerifyStatus.text = "Enabled — barcodes will be authenticated"
+            authStatusDot.setBackgroundResource(R.drawable.green_dot_bg)
+            txtAuthStatus.text = "Authentication active"
+        } else {
+            txtVerifyStatus.text = "Disabled — authenticity not checked"
+            authStatusDot.setBackgroundResource(R.drawable.grey_dot_bg)
+            txtAuthStatus.text = "Authentication inactive"
+        }
+    }
+}
+
+/*
+package com.example.scanner_sdk.customview.dialog
+
 import android.content.DialogInterface
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -166,4 +337,4 @@ class VerificationSettingsBottomSheet : BottomSheetDialogFragment() {
             txtAuth.text = "Authentication inactive"
         }
     }
-}
+}*/
