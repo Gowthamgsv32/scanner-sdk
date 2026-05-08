@@ -989,7 +989,11 @@ class ScannerController(
 
         val (parsed, barcode, encrypted) = parseBarcodeLikeMultiScan(raw)
         val type = getBarcodeTypeName(firstBarcode.format)
-        showScanResultBottomSheet(raw = raw, parsedMap = parsed, type = type)
+        val gson = Gson()
+
+        val json = gson.toJson(parsed)
+        result(Pair(raw, JSONArray(json)))
+ //       showScanResultBottomSheet(raw = raw, parsedMap = parsed, type = type)
     }
 
     private fun bindCamera(
