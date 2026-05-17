@@ -28,12 +28,12 @@ import com.example.scanner_sdk.customview.authandsingle.CommonScannerView
 import com.example.scanner_sdk.customview.authandsingle.VerificationScannerView
 import com.example.scanner_sdk.customview.dialog.AuthResultDialog
 import com.example.scanner_sdk.customview.dialog.ScanResultBottomSheet
-import com.example.scanner_sdk.customview.dialog.VerificationSettingsBottomSheet
 import com.example.scanner_sdk.customview.getBarcodeTypeName
 import com.example.scanner_sdk.customview.log
 import com.example.scanner_sdk.customview.model.BarcodeAuthMultiRequest
 import com.example.scanner_sdk.customview.model.FrameMetadata
 import com.example.scanner_sdk.customview.model.GS1ParsedResult
+import com.example.scanner_sdk.customview.model.ScannerConfig
 import com.example.scanner_sdk.customview.multi.BarcodeListActivity
 import com.example.scanner_sdk.customview.multi.view.MultiScannerView
 import com.example.scanner_sdk.customview.parseBarcodeLikeMultiScan
@@ -55,14 +55,15 @@ import org.json.JSONArray
 import java.util.concurrent.Executors
 
 class ScannerController(
+    private val config: ScannerConfig = ScannerConfig(),
     private val singleScannerView: SingleScannerView? = null,
     private val multiScanner: MultiScannerView? = null,
     private val authScannerView: AuthScannerView? = null,
     private val verificationScanner: VerificationScannerView? = null,
     private val commonScannerView: CommonScannerView? = null,
     private val lifecycleOwner: LifecycleOwner,
-    private val fragmentManager: FragmentManager, // 👈 ADD THIS
-    private val openGallery: () -> Unit,   // 👈 ADD THIS
+    private val fragmentManager: FragmentManager,
+    private val openGallery: () -> Unit,
     private val error: (Pair<String, String>) -> Unit,
     private val result: (Pair<String, JSONArray?>) -> Unit,
 ) {
@@ -82,8 +83,6 @@ class ScannerController(
     private var minZoom = 1f
     private var maxZoom = 5f
     private val ZOOM_STEP = 0.5f
-    var currentScanMode = ScanMode.SINGLE
-    var isVerifyEnabled = false
 
     fun startSingleScanner(context: Context) {
         start(context)
@@ -98,7 +97,13 @@ class ScannerController(
     }
 
     fun startVerifyScanner(context: Context, userId: String, companyId: String) {
-        startVerifyView(context, userId, companyId, verificationScanner, multiScanner)
+        applyScannerModeFromConfig(
+            context = context,
+            userId = userId,
+            companyId = companyId,
+            verificationScannerView = verificationScanner,
+            multiScannerView = multiScanner,
+        )
     }
 
     fun startMultiScanner(context: Context, userId: String, companyId: String) {
@@ -145,7 +150,7 @@ class ScannerController(
                     }
 
                     commonScannerView != null -> {
-                        if (isVerifyEnabled) {
+                        if (config.verifyAuthenticity) {
                             handleAuthScan(
                                 barcodes = barcodes,
                                 userId = userId,
@@ -417,60 +422,6 @@ class ScannerController(
     }
 
     private fun startCommonView(context: Context, userId: String, companyId: String) {
-        commonScannerView?.verificationScannerView?.visibility = View.VISIBLE
-        commonScannerView?.verificationScannerView?.previewView?.visibility = View.VISIBLE
-
-        // ── "More" button → open VerificationSettingsBottomSheet ─────────────────
-        commonScannerView?.more?.setOnClickListener {
-            val sheet = VerificationSettingsBottomSheet.newInstance(
-                scanMode        = currentScanMode,
-                isVerifyEnabled = isVerifyEnabled,
-            )
-
-            // ── Scan mode changed inside the sheet ──────────────────────────────
-            sheet.onScanModeChanged = { mode ->
-                currentScanMode = mode
-
-                when (mode) {
-                    ScanMode.MULTI -> {
-                        // 1. Hide verification view, show multi view
-                        commonScannerView.verificationScannerView.visibility = View.GONE
-                        commonScannerView.multiScannerView.visibility = View.VISIBLE
-
-                        // 2. Stop the current (single/verify) camera session
-                        stop()
-
-                        // 3. Start multi-camera on the now-visible MultiScannerView
-                        startCamera(context, userId, companyId, commonScannerView.multiScannerView)
-                    }
-
-                    ScanMode.SINGLE -> {
-                        // 1. Hide multi view, show verification view
-                        commonScannerView.multiScannerView.visibility        = View.GONE
-                        commonScannerView.verificationScannerView.visibility = View.VISIBLE
-
-                        // 2. Stop multi-camera session
-                        stop()
-
-                        // 3. Re-start the verify camera
-                        startVerifyView(context, userId, companyId, commonScannerView.verificationScannerView,null)
-                    }
-
-                    else -> {}
-                }
-            }
-
-            sheet.onVerifyAuthenticityChanged = { enabled ->
-                isVerifyEnabled = enabled
-            }
-
-            sheet.onDismissCallback = {
-                // no-op — camera is already running
-            }
-
-            sheet.show(fragmentManager, "VerificationSettings")
-        }
-
         // ── Flash ─────────────────────────────────────────────────────────────────
         commonScannerView?.flashButton?.setOnClickListener {
             isFlashEnabled = !isFlashEnabled
@@ -502,13 +453,37 @@ class ScannerController(
             }
         }
 
-        startVerifyView(context, userId, companyId, commonScannerView?.verificationScannerView,null)
+        applyScannerModeFromConfig(
+            context = context,
+            userId = userId,
+            companyId = companyId,
+            verificationScannerView = commonScannerView?.verificationScannerView,
+            multiScannerView = commonScannerView?.multiScannerView,
+        )
     }
-// ─── Replace your existing startVerifyView() in ScannerController.kt ───────────
-//
-// The key change: onScanModeChanged now hides verificationScannerView,
-// shows multiScannerView, and starts the multi-camera — or reverses that.
-// Everything else in ScannerController stays the same.
+
+    private fun applyScannerModeFromConfig(
+        context: Context,
+        userId: String,
+        companyId: String,
+        verificationScannerView: VerificationScannerView?,
+        multiScannerView: MultiScannerView?,
+    ) {
+        when (config.scanMode) {
+            ScanMode.MULTI -> {
+                verificationScannerView?.visibility = View.GONE
+                multiScannerView?.visibility = View.VISIBLE
+                startCamera(context, userId, companyId, multiScannerView)
+            }
+            ScanMode.SINGLE -> {
+                multiScannerView?.visibility = View.GONE
+                verificationScannerView?.visibility = View.VISIBLE
+                verificationScannerView?.previewView?.visibility = View.VISIBLE
+                startVerifyView(context, userId, companyId, verificationScannerView, multiScannerView)
+            }
+            else -> {}
+        }
+    }
 
     private fun startVerifyView(
         context: Context,
@@ -518,57 +493,6 @@ class ScannerController(
         multiScannerView: MultiScannerView?
     ) {
         verificationScannerView?.previewView?.visibility = View.VISIBLE
-
-        // ── "More" button → open VerificationSettingsBottomSheet ─────────────────
-        verificationScannerView?.more?.setOnClickListener {
-            val sheet = VerificationSettingsBottomSheet.newInstance(
-                scanMode        = currentScanMode,
-                isVerifyEnabled = isVerifyEnabled,
-            )
-
-            // ── Scan mode changed inside the sheet ──────────────────────────────
-            sheet.onScanModeChanged = { mode ->
-                currentScanMode = mode
-
-                when (mode) {
-                    ScanMode.MULTI -> {
-                        // 1. Hide verification view, show multi view
-                        verificationScannerView?.visibility = View.GONE
-                        multiScannerView?.visibility        = View.VISIBLE
-
-                        // 2. Stop the current (single/verify) camera session
-                        stop()
-
-                        // 3. Start multi-camera on the now-visible MultiScannerView
-                        startCamera(context, userId, companyId, multiScannerView)
-                    }
-
-                    ScanMode.SINGLE -> {
-                        // 1. Hide multi view, show verification view
-                        multiScannerView?.visibility        = View.GONE
-                        verificationScannerView?.visibility = View.VISIBLE
-
-                        // 2. Stop multi-camera session
-                        stop()
-
-                        // 3. Re-start the verify camera
-                        startVerifyView(context, userId, companyId, verificationScannerView, multiScannerView)
-                    }
-
-                    else -> {}
-                }
-            }
-
-            sheet.onVerifyAuthenticityChanged = { enabled ->
-                isVerifyEnabled = enabled
-            }
-
-            sheet.onDismissCallback = {
-                // no-op — camera is already running
-            }
-
-            sheet.show(fragmentManager, "VerificationSettings")
-        }
 
         // ── Flash ─────────────────────────────────────────────────────────────────
         verificationScannerView?.flashButton?.setOnClickListener {
@@ -629,11 +553,11 @@ class ScannerController(
                 onResults = { barcodes, meta ->
                     if (!shouldResumeScanning) return@BarcodeAnalyzer
 
-                    if (currentScanMode == ScanMode.MULTI) {
+                    if (config.scanMode == ScanMode.MULTI) {
                         // Multi-mode is handled by startCamera(); nothing to do here
                         // (this analyzer only runs while in verify/single view)
                     } else {
-                        if (isVerifyEnabled) {
+                        if (config.verifyAuthenticity) {
                             handleAuthScan(
                                 barcodes   = barcodes,
                                 userId     = userId,

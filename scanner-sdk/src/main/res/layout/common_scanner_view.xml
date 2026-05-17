@@ -94,18 +94,6 @@
             android:padding="10dp"
             app:tint="@color/white" />
 
-        <ImageButton
-            android:id="@+id/common_view_btn_more"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:layout_marginStart="10dp"
-            android:background="@drawable/round_bg_dark"
-            android:src="@drawable/ic_more"
-            android:contentDescription="More"
-            android:scaleType="centerInside"
-            android:padding="10dp"
-            app:tint="@color/white" />
-
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

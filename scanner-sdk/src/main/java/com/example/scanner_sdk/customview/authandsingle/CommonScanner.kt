@@ -30,7 +30,6 @@ class CommonScannerView @JvmOverloads constructor(
     val btnGallery: ImageButton
     val flashButton: ImageButton
     val cameraSwitch: ImageButton
-    val more: ImageButton
 
     init {
         LayoutInflater.from(context).inflate(R.layout.common_scanner_view, this, true)
@@ -42,8 +41,6 @@ class CommonScannerView @JvmOverloads constructor(
         btnGallery = findViewById(R.id.common_view_btn_gallery)
         flashButton = findViewById(R.id.common_view_btn_flash_toggle)
         cameraSwitch = findViewById(R.id.common_view_btn_camera_switch)
-        more = findViewById(R.id.common_view_btn_more)
-
     }
 
     private fun startScanLineAnimation() {
