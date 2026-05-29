@@ -37,6 +37,8 @@ import com.example.scanner_sdk.customview.model.ScannerConfig
 import com.example.scanner_sdk.customview.multi.BarcodeListActivity
 import com.example.scanner_sdk.customview.multi.view.MultiScannerView
 import com.example.scanner_sdk.customview.parseBarcodeLikeMultiScan
+import com.example.scanner_sdk.customview.helper.AuthBarcodeParser
+import com.example.scanner_sdk.customview.helper.AuthBcResponseParser
 import com.example.scanner_sdk.customview.parseBarcodeLikeMultiScanForAuth
 import com.example.scanner_sdk.customview.single.view.SingleScannerView
 import com.example.scanner_sdk.customview.toggleFlash
@@ -969,26 +971,15 @@ class ScannerController(
                 encryptedText = encryptedText,
                 companyId = authCompanyId,
                 userId = userId,
-                onError = {
-                    val gson = Gson()
-                    val jsonString = gson.toJson(result)
-                    onError(Pair(raw, jsonString))
-                    /*                    showAuthScanResult(
-                                            raw = barcode,
-                                            parsedMap = result.parsedResults,
-                                            isError = true,
-                                            message = it
-                                        )*/
+                onError = { responseBody ->
+                    val enriched = AuthBarcodeParser.withAuthResponse(result, responseBody)
+                    onError(Pair(raw, Gson().toJson(enriched)))
                 },
-                onSuccess = {
-                    onScanned(Pair(raw, it))
-                    /*                    showAuthScanResult(
-                                            raw = barcode,
-                                            parsedMap = result.parsedResults,
-                                            message = it,
-                                            isError = false,
-                                        )*/
-                }
+                onSuccess = { responseBody ->
+                    val enriched = AuthBarcodeParser.withAuthResponse(result, responseBody)
+                    val quality = AuthBcResponseParser.parse(responseBody)?.quality ?: "Real"
+                    onScanned(Pair(raw, authScanResultArray(enriched, quality)))
+                },
             )
         }
 
@@ -1007,7 +998,7 @@ class ScannerController(
         companyId: String,
         userId: String,
         onError: (String) -> Unit,
-        onSuccess: (JSONArray?) -> Unit,
+        onSuccess: (String) -> Unit,
     ) {
         val url = "https://dlhub.8aiku.com/scan/auth-bc"
 
@@ -1048,7 +1039,12 @@ class ScannerController(
                 return
             }
 
-            onSuccess(JSONArray(responseBody))
+            if (!response.isSuccessful) {
+                onError(responseBody)
+                return
+            }
+
+            onSuccess(responseBody)
             /*            val jsonElement = JsonParser.parseString(responseBody)
 
                         log("jsonElement" + jsonElement)
@@ -1081,6 +1077,19 @@ class ScannerController(
         } finally {
             /*Todo*/
         }
+    }
+
+    private fun authScanResultArray(
+        parsed: com.example.scanner_sdk.customview.model.ParsedAuthBarcode,
+        quality: String,
+    ): JSONArray {
+        val item = AuthBcResponseParser.AuthBcItem(
+            barcodeData = parsed.barcodeData,
+            encryptedText = parsed.encryptedText,
+            quality = quality,
+            gs1Results = parsed.parsedResults,
+        )
+        return JSONArray(AuthBcResponseParser.toResultArray(item).toString())
     }
 
     private fun showAuthScanResult(

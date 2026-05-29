@@ -115,39 +115,17 @@ class BarcodeListActivity : FragmentActivity() {
     }
     fun parseScanResponse(jsonString: String, barcode: String, type: String): ScanResult? {
         return try {
-            val array = JSONArray(jsonString)
-            if (array.length() == 0) return null
-
-            val obj: JSONObject = array.getJSONObject(0)
-
-            val barcodeData   = obj.optString("barcode_data", "")
-            val encryptedText = obj.optString("encrypted_text", "")
-            val quality       = obj.optString("quality", "Unknown")
-
-            // gs1_data is a JSON object whose keys are AI numbers
-            val gs1Object: JSONObject = obj.optJSONObject("gs1_data") ?: JSONObject()
-            val gs1Fields = mutableListOf<Gs1Field>()
-
-            val keys = gs1Object.keys()
-            while (keys.hasNext()) {
-                val ai = keys.next()
-                val fieldObj: JSONObject = gs1Object.optJSONObject(ai) ?: continue
-                gs1Fields.add(
-                    Gs1Field(
-                        ai    = ai,
-                        name  = fieldObj.optString("name", ai),
-                        value = fieldObj.optString("value", "—")
-                    )
-                )
-            }
-
+            val item = com.example.scanner_sdk.customview.helper.AuthBcResponseParser.parse(jsonString)
+                ?: return null
             ScanResult(
                 raw = barcode,
                 type = type,
-                barcodeData   = barcodeData,
-                gs1Fields     = gs1Fields,
-                encryptedText = encryptedText,
-                quality       = quality
+                barcodeData = item.barcodeData,
+                gs1Fields = item.gs1Results.map { r ->
+                    Gs1Field(ai = r.ai, name = r.description, value = r.value)
+                },
+                encryptedText = item.encryptedText,
+                quality = item.quality,
             )
         } catch (e: Exception) {
             e.printStackTrace()

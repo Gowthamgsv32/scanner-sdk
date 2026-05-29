@@ -6,7 +6,7 @@ import com.example.scanner_sdk.customview.model.ParsedAuthBarcode
 
 /**
  * Builds auth API payloads to match iOS: bracketed GS1 for FNC1 scans,
- * Digital Link base URL (no ?98=) for URL scans, encrypted_text from AI-98.
+ * Digital Link base URL (no auth trailer) for URL scans, encrypted_text from AI-98.
  */
 object AuthBarcodeParser {
 
@@ -26,11 +26,24 @@ object AuthBarcodeParser {
         return parsePlain(raw, type)
     }
 
+    /**
+     * Prefer [AuthBcResponseParser] GS1 fields when auth API returns `gs1_data`.
+     */
+    fun withAuthResponse(local: ParsedAuthBarcode, responseBody: String): ParsedAuthBarcode {
+        val fromApi = AuthBcResponseParser.parse(responseBody) ?: return local
+        val gs1 = fromApi.gs1Results
+        if (gs1.isEmpty()) return local
+        return local.copy(
+            parsedResults = gs1,
+            barcodeData = fromApi.barcodeData.ifEmpty { local.barcodeData },
+            encryptedText = fromApi.encryptedText.ifEmpty { local.encryptedText },
+        )
+    }
+
     private fun parseDigitalLink(raw: String, type: String): ParsedAuthBarcode {
-        val barcodeData = digitalLinkBaseUrl(raw)
-        val encryptedText = extractQueryAi(raw, "98")
-        val companyFromBarcode = extractQueryAi(raw, "97")
-            .ifEmpty { extractTrailingPathAi(raw, "97") }
+        val barcodeData = GS1DigitalLinkAuth.cleanDigitalLinkUrl(raw)
+        val encryptedText = GS1DigitalLinkAuth.extractEncryptedText(raw)
+        val companyId = GS1DigitalLinkAuth.extractCompanyId(raw)
 
         val parsedResults = GS1URLParser.parseDigitalLink(barcodeData).map {
             GS1ParsedResult(ai = it.ai, value = it.value, description = it.description)
@@ -41,7 +54,7 @@ object AuthBarcodeParser {
             barcodeData = barcodeData,
             encryptedText = encryptedText,
             isGeneratedBySystem = encryptedText.isNotEmpty(),
-            companyId = companyFromBarcode,
+            companyId = companyId,
             type = type,
         )
     }
@@ -97,23 +110,11 @@ object AuthBarcodeParser {
         )
     }
 
-    /** Base URL path only — no ?98=, &97=, trailing /97=, or FNC1 tail. */
-    fun digitalLinkBaseUrl(raw: String): String {
-        var url = raw.substringBefore(FNC1).trim()
-        url = url.substringBefore("?98=").substringBefore("&98=")
-        url = url.replace(Regex("""/97=[^/?]+$"""), "").trimEnd('/')
-        return url
-    }
+    /** @see GS1DigitalLinkAuth.cleanDigitalLinkUrl */
+    fun digitalLinkBaseUrl(raw: String): String = GS1DigitalLinkAuth.cleanDigitalLinkUrl(raw)
 
     fun extractQueryAi(raw: String, ai: String): String {
         Regex("""[?&]$ai=([^&/\u001D]+)""").find(raw)?.groupValues?.getOrNull(1)?.let {
-            return it.trim()
-        }
-        return ""
-    }
-
-    private fun extractTrailingPathAi(raw: String, ai: String): String {
-        Regex("""/$ai=([^/?\u001D]+)""").find(raw)?.groupValues?.getOrNull(1)?.let {
             return it.trim()
         }
         return ""
