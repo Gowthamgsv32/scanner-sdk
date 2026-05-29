@@ -7,6 +7,7 @@ import com.example.scanner_sdk.R
 import com.example.scanner_sdk.customview.helper.AuthBarcodeParser
 import com.example.scanner_sdk.customview.helper.GS1URLParser
 import com.example.scanner_sdk.customview.helper.GS1Utils
+import com.example.scanner_sdk.customview.helper.GS1ParseSupport
 import com.example.scanner_sdk.customview.model.GS1ParsedResult
 import com.example.scanner_sdk.customview.model.ParsedAuthBarcode
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -292,15 +293,14 @@ object GS1Parser {
 
         val regex = Regex("""\((\d{2,4})\)([^\(]+)""")
 
-        return regex.findAll(data).map {
-
+        return regex.findAll(data).mapNotNull {
             val ai = it.groupValues[1]
+            if (GS1ParseSupport.isAuthTrailerAI(ai)) return@mapNotNull null
             val value = it.groupValues[2]
-
             GS1ParsedResult(
                 ai,
                 value,
-                aiDict[ai]?.first ?: "Unknown AI"
+                aiDict[ai]?.first ?: "Unknown AI",
             )
         }.toList()
     }
@@ -464,66 +464,61 @@ object GS1Parser {
 
         val results = mutableListOf<GS1ParsedResult>()
 
-        // ✅ Normalize input (important for Android/iOS FNC1 consistency)
-        val input = inputRaw.replace('\u001D', FNC1)
+        val input = buildString(inputRaw.length) {
+            inputRaw.forEach { c ->
+                if (c == GS1ParseSupport.FNC1 || c.code >= 32) append(c)
+            }
+        }
 
         val size = input.length
-        val hasFNC1 = input.contains(FNC1)
+        val hasFNC1 = input.contains(GS1ParseSupport.FNC1)
 
-        // ---------------------------------------------------------
-        // ✅ STRICT: If pure GTIN/EAN → do NOT treat as GS1 string
-        // ---------------------------------------------------------
         val isPureGTIN =
             input.all { it.isDigit() } &&
-                    (size == 8 || size == 12 || size == 13 || size == 14)
+                (size == 8 || size == 12 || size == 13 || size == 14)
 
-        if (isPureGTIN) {
-            return emptyList()
-        }
+        if (isPureGTIN) return emptyList()
 
         var index = 0
 
         fun looksLikeAI(pos: Int): String? {
-
             for (len in listOf(4, 3, 2)) {
-
                 if (pos + len > size) continue
-
                 val candidate = input.substring(pos, pos + len)
                 val meta = aiDict[candidate]
 
                 if (meta != null) {
-
-                    // ✅ STRICT: 91–99 only valid if GS1 structure exists
-                    if (candidate in listOf(
-                            "91","92","93","94","95","96","97","98","99"
-                        )
-                        && !hasFNC1
-                        && pos == 0
-                    ) {
-                        return null
+                    val fixedLen = meta.second
+                    if (fixedLen != null) {
+                        if (pos + len + fixedLen > size) continue
+                        val value = input.substring(pos + len, pos + len + fixedLen)
+                        if (!GS1ParseSupport.isNumericGS1FixedValue(candidate, value, fixedLen)) {
+                            continue
+                        }
                     }
-
                     return candidate
                 }
 
-                // Measure AIs (310x, 390x etc.)
+                if (len == 2) {
+                    val num = candidate.toIntOrNull()
+                    if (num != null && num in 91..99) return candidate
+                }
+
                 if (len == 4) {
-
                     val prefix3 = candidate.take(3).toIntOrNull()
-
-                    if (prefix3 != null && prefix3 in 310..369) return candidate
-                    if (prefix3 != null && prefix3 in 390..395) return candidate
+                    val lastDigit = candidate.last()
+                    if (lastDigit.isDigit()) {
+                        if (prefix3 != null && prefix3 in 310..369) return candidate
+                        if (prefix3 != null && prefix3 in 390..395) return candidate
+                        if (prefix3 == 703 || prefix3 == 723) return candidate
+                    }
                 }
             }
-
             return null
         }
 
         while (index < size) {
-
-            // Skip FNC1 separators
-            while (index < size && input[index] == FNC1) index++
+            while (index < size && input[index] == GS1ParseSupport.FNC1) index++
             if (index >= size) break
 
             val ai = looksLikeAI(index) ?: run {
@@ -531,50 +526,54 @@ object GS1Parser {
                 continue
             }
 
+            if (GS1ParseSupport.isAuthTrailerAI(ai)) break
+
             index += ai.length
 
-            val meta = aiDict[ai]
-            val fixedLen = meta?.second
+            val prefix3 = if (ai.length >= 3) ai.take(3).toIntOrNull() else null
 
-            if (fixedLen != null) {
+            // Measurement AIs (310n–369n)
+            if (ai.length == 4 && prefix3 != null && prefix3 in 310..369) {
+                if (index + 6 > size) break
+                val value = input.substring(index, index + 6)
+                results.add(GS1ParsedResult(ai, value, "Measurement"))
+                index += 6
+                continue
+            }
 
-                // -------------------------------
-                // ✅ Fixed Length AI
-                // -------------------------------
-                if (index + fixedLen > size) break
-
-                val value = input.substring(index, index + fixedLen)
-
-                results.add(
-                    GS1ParsedResult(ai, value, meta.first)
-                )
-
-                index += fixedLen
-            } else {
-
-                // -------------------------------
-                // ✅ Variable Length AI
-                // -------------------------------
+            // Monetary AIs (390n–395n)
+            if (ai.length == 4 && prefix3 != null && prefix3 in 390..395) {
                 val start = index
-
                 while (index < size) {
-
-                    if (input[index] == FNC1) break
-
-                    val nextAI = looksLikeAI(index)
-                    if (!hasFNC1 && nextAI != null && index > start) break
-
+                    if (hasFNC1 && input[index] == GS1ParseSupport.FNC1) break
+                    val next = looksLikeAI(index)
+                    if (!hasFNC1 && GS1ParseSupport.isPlausibleNextAI(input, index, next, ai)) break
                     index++
                 }
-
-                val value = input.substring(start, index)
-
                 results.add(
-                    GS1ParsedResult(
-                        ai,
-                        value,
-                        meta?.first ?: "AI $ai"
-                    )
+                    GS1ParsedResult(ai, input.substring(start, index), "Monetary Amount"),
+                )
+                continue
+            }
+
+            val meta = aiDict[ai] ?: continue
+            val fixedLen = meta.second
+
+            if (fixedLen != null) {
+                if (index + fixedLen > size) break
+                val value = input.substring(index, index + fixedLen)
+                results.add(GS1ParsedResult(ai, value, meta.first))
+                index += fixedLen
+            } else {
+                val start = index
+                while (index < size) {
+                    if (hasFNC1 && input[index] == GS1ParseSupport.FNC1) break
+                    val next = looksLikeAI(index)
+                    if (!hasFNC1 && GS1ParseSupport.isPlausibleNextAI(input, index, next, ai)) break
+                    index++
+                }
+                results.add(
+                    GS1ParsedResult(ai, input.substring(start, index), meta.first),
                 )
             }
         }

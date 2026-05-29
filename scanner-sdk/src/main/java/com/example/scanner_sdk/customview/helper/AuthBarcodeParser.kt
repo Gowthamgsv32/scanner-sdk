@@ -121,7 +121,7 @@ object AuthBarcodeParser {
 
     fun formatBracketed(parsed: List<GS1ParsedResult>): String =
         parsed
-            .filter { it.ai !in setOf("97", "98") }
+            .filter { !GS1ParseSupport.isAuthTrailerAI(it.ai) }
             .joinToString("") { "(${it.ai})${it.value}" }
 
     private fun looksLikeFlatGs1(raw: String): Boolean {
