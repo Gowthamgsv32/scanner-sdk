@@ -45,21 +45,6 @@ class BarcodeListActivity : FragmentActivity() {
         val companyId = intent.getStringExtra("COMPANY_ID") ?: ""
         val userId = intent.getStringExtra("USER_ID") ?: ""
 
-        fun removeCompanyId(text: String): List<String> {
-            return when {
-                text.contains("(98)") -> text.split("(98)")
-                text.contains("(97)") -> text.split("(97)")
-                text.contains("/98)") -> text.split("/98")
-                text.contains("/97") -> text.split("/97")
-                text.contains("/97") -> text.split("/97")
-                text.contains("\u001D98") -> text.split("\u001D98")
-                text.contains("\u001D97") -> text.split("\u001D97")
-//                text.contains("98") -> text.split("98") // Todo handle this type here
-//                text.contains("97") -> text.split("97") // Todo handle this type here
-                else -> listOf(text)
-            }
-        }
-
         // Show loading
         progressBar.visibility = View.VISIBLE
 
@@ -80,15 +65,17 @@ class BarcodeListActivity : FragmentActivity() {
                 async(Dispatchers.IO) {
 
                     val barcodeData = result.split("~~~~~")
-                    val barcodeValues = removeCompanyId(barcodeData[0])
+                    val rawValue = barcodeData[0]
+                    val barcodeType = if (barcodeData.size > 1) barcodeData[1] else ""
+                    val parsed = parseBarcodeLikeMultiScanForAuth(rawValue, barcodeType)
+                    val authCompanyId = parsed.companyId.ifEmpty { companyId }
 
                     val apiResult = authenticateBarcodeSuspend(
-                        raw = barcodeData[0],
-                        barcode = barcodeValues[0],
-                        type = if (barcodeData.size > 1) barcodeData[1] else "",
-                        encryptedText = if (barcodeValues.size > 1)
-                            removeCompanyId(barcodeValues[1])[0] else "",
-                        companyId = companyId,
+                        raw = rawValue,
+                        barcode = parsed.barcodeData,
+                        type = barcodeType,
+                        encryptedText = parsed.encryptedText,
+                        companyId = authCompanyId,
                         userId = userId,
                     )
 

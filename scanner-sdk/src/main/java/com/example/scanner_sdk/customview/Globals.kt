@@ -4,6 +4,7 @@ import android.util.Log
 import android.widget.ImageView
 import androidx.camera.core.ImageCapture
 import com.example.scanner_sdk.R
+import com.example.scanner_sdk.customview.helper.AuthBarcodeParser
 import com.example.scanner_sdk.customview.helper.GS1URLParser
 import com.example.scanner_sdk.customview.helper.GS1Utils
 import com.example.scanner_sdk.customview.model.GS1ParsedResult
@@ -123,83 +124,8 @@ fun parseBarcodeLikeMultiScan(value: String): Triple<
     }
 }
 
-fun parseBarcodeLikeMultiScanForAuth(value: String, type: String): ParsedAuthBarcode {
-
-//    val splitted = GS1Utils.splitByAI98(value)
-    val normalized = value.replace('\u001D', 29.toChar())
-    val splitted = GS1Utils.splitByAI98(normalized)
-
-    val parseGS1Results = GS1Parser.parseGS1(value)
-
-    // ✅ Always parse Digital Link if URL
-    val parsedURL = GS1URLParser.parseDigitalLink(value)
-    val normalizedParsed = parsedURL.map {
-        GS1ParsedResult(
-            ai = it.ai,
-            value = it.value,
-            description = it.description
-        )
-    }
-
-    val parsing = ConvertToAuthentication
-        .convertDynamicPathToGS1(value)
-
-    // ---------- DIGITAL LINK ----------
-    if (value.startsWith("http")) {
-
-        // 🔐 Auth only if AI-98 exists
-        val splitted = GS1Utils.splitByAI98(
-            parsing.originalWithout98
-        )
-
-        return if (splitted != null) {
-            ParsedAuthBarcode(
-                parsedResults = normalizedParsed,
-                barcodeData = splitted.barcodeData,
-                encryptedText = splitted.encryptedText,
-                isGeneratedBySystem = true,
-                companyId = splitted.companyId,
-                type = type,
-            )
-        } else {
-            // ✅ Valid GS1 Digital Link, but NOT system-generated
-            ParsedAuthBarcode(
-                parsedResults = normalizedParsed,
-                barcodeData = value,
-                encryptedText = "",
-                isGeneratedBySystem = false,
-                companyId = "",
-                type = type,
-            )
-        }
-    }
-
-    // ---------- NORMAL GS1 ----------
-    /*    val splitted = GS1Utils.splitByAI98(
-            parsing.originalWithout98
-        )*/
-
-    if (splitted != null) {
-        return ParsedAuthBarcode(
-            parsedResults = parseGS1Results,
-            barcodeData = splitted.barcodeData,
-            encryptedText = splitted.encryptedText,
-            isGeneratedBySystem = true,
-            companyId = splitted.companyId,
-            type = type,
-        )
-    }
-
-    // ---------- PLAIN GS1 ----------
-    return ParsedAuthBarcode(
-        parsedResults = parseGS1Results,
-        barcodeData = value,
-        encryptedText = "",
-        isGeneratedBySystem = false,
-        companyId = "",
-        type = type,
-    )
-}
+fun parseBarcodeLikeMultiScanForAuth(value: String, type: String): ParsedAuthBarcode =
+    AuthBarcodeParser.parse(value, type)
 
 object GS1Parser {
 

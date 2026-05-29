@@ -955,25 +955,9 @@ class ScannerController(
         val type = getBarcodeTypeName(barcodes.format)
         val result = parseBarcodeLikeMultiScanForAuth(raw, type)
 
-        fun removeCompanyId(text: String): List<String> {
-            return when {
-                text.contains("(98)") -> text.split("(98)")
-                text.contains("(97)") -> text.split("(97)")
-                text.contains("/98)") -> text.split("/98")
-                text.contains("/97") -> text.split("/97")
-                text.contains("/97") -> text.split("/97")
-                text.contains("\u001D98") -> text.split("\u001D98")
-                text.contains("\u001D97") -> text.split("\u001D97")
-//                text.contains("98") -> text.split("98") // Todo handle this type here
-//                text.contains("97") -> text.split("97") // Todo handle this type here
-                else -> listOf(text)
-            }
-        }
-
-        val extractedTxt = removeCompanyId(raw)
-        val barcode = extractedTxt[0]
-        val encryptedText =
-            if (extractedTxt.size > 1) if (extractedTxt[1].length > 18) removeCompanyId(extractedTxt[1])[0] else extractedTxt[1] else ""
+        val barcode = result.barcodeData
+        val encryptedText = result.encryptedText
+        val authCompanyId = result.companyId.ifEmpty { companyId }
 
         Log.d("BARCODESCANNERLOG", raw)
         Log.d("BARCODESCANNERLOG", barcode)
@@ -983,7 +967,7 @@ class ScannerController(
             authenticateBarcode(
                 barcode = barcode,
                 encryptedText = encryptedText,
-                companyId = companyId,
+                companyId = authCompanyId,
                 userId = userId,
                 onError = {
                     val gson = Gson()

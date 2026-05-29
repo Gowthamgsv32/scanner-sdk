@@ -151,15 +151,22 @@ object GS1Utils {
                     token.startsWith("97") ->
                         companyId = token.drop(2)
 
-                    token.contains("98") -> {
-                        val idx = token.indexOf("98")
-                        barcodeData += token.substring(0, idx)
-                        encryptedText = token.substring(idx + 2)
-                    }
+                    token.startsWith("98") ->
+                        encryptedText = token.drop(2)
 
-                    else -> barcodeData += token
+                    else -> {
+                        val idx98 = token.indexOf("98")
+                        if (idx98 > 0) {
+                            barcodeData += token.substring(0, idx98)
+                            encryptedText = token.substring(idx98 + 2)
+                        } else {
+                            barcodeData += token
+                        }
+                    }
                 }
             }
+
+            if (encryptedText.isEmpty()) return null
 
             return AI98SplitResult(barcodeData, encryptedText, companyId)
         }

@@ -21,7 +21,13 @@ object GS1URLParser {
     )
 
     fun parseDigitalLink(urlString: String): List<GS1URLParsedResult> {
-        val uri = runCatching { android.net.Uri.parse(urlString) }.getOrNull()
+        val baseUrl = urlString
+            .substringBefore("?98=")
+            .substringBefore("&98=")
+            .replace(Regex("""/97=[^/?]+$"""), "")
+            .trimEnd('/')
+
+        val uri = runCatching { android.net.Uri.parse(baseUrl) }.getOrNull()
             ?: return emptyList()
 
         val results = mutableListOf<GS1URLParsedResult>()

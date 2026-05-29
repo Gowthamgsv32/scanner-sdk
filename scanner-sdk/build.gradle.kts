@@ -35,7 +35,7 @@ android {
 }
 
 group = "com.github.Gowthamgsv32"
-version = "1.9.15"
+version = "1.9.16"
 
 dependencies {
     implementation(libs.androidx.core.ktx)
